@@ -35,7 +35,7 @@
   };
   window = {
     border = 1;
-    active = ["#2f6fd6cc"];
-    inactive = ["#dcdce4aa"];
+    active = ["#2f6fd666"];
+    inactive = ["#dcdce466"];
   };
 }

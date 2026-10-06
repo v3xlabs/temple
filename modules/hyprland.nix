@@ -135,7 +135,6 @@ in {
         },
       },
       decoration = {
-        rounding = ${toString theme.radius},
         blur = { enabled = ${lib.boolToString (theme.glass.blur > 0)}, size = ${toString theme.glass.blur}, passes = 3, vibrancy = 0.2 },
       },
       misc = { background_color = 0xff${lib.removePrefix "#" theme.palette.base00} },
@@ -152,8 +151,8 @@ in {
 
     hl.config({
       general = {
-        gaps_in = 6,
-        gaps_out = 12,
+        gaps_in = 0,
+        gaps_out = 0,
         layout = "dwindle",
       },
       decoration = {

@@ -35,9 +35,9 @@
     size = 12;
   };
   window = {
-    border = 2;
-    active = ["#6fa8dcaa" "#2a5a8aaa"];
-    inactive = ["#3a4a5a88"];
+    border = 1;
+    active = ["#6fa8dc88" "#2a5a8a88"];
+    inactive = ["#3a4a5a55"];
   };
   bar = {
     height = 40;

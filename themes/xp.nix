@@ -53,7 +53,7 @@
     size = 12;
   };
   window = {
-    border = 3;
+    border = 1;
     active = ["#0058ee" "#3a93ff"];
     inactive = ["#7a96df" "#a6b9e8"];
   };
