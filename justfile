@@ -9,9 +9,9 @@ vm:
 build:
     nix build path:.#vm
 
-# Run the shell on the host, against the checked-in dark theme
+# Run this checkout's shell against the VM's generated config. Inside a Temple session, stop the running shell first.
 shell:
-    nix eval --json path:.#themes.dark > .tmp/theme.json && nix eval --raw 'path:.#nixosConfigurations.vm.config.environment.etc."temple/backgrounds.json".text' > .tmp/backgrounds.json && nix eval --raw 'path:.#nixosConfigurations.vm.config.environment.etc."temple/keybinds.json".text' > .tmp/keybinds.json && TEMPLE_THEME=.tmp/theme.json TEMPLE_BACKGROUNDS=.tmp/backgrounds.json TEMPLE_KEYBINDS=.tmp/keybinds.json qs -p shell
+    for f in themes backgrounds keybinds commands; do nix eval --raw "path:.#nixosConfigurations.vm.config.environment.etc.\"temple/$f.json\".text" > .tmp/$f.json || exit 1; done; TEMPLE_THEMES=.tmp/themes.json TEMPLE_BACKGROUNDS=.tmp/backgrounds.json TEMPLE_KEYBINDS=.tmp/keybinds.json TEMPLE_COMMANDS=.tmp/commands.json qs -p shell
 
 # Evaluate every flake output
 check:

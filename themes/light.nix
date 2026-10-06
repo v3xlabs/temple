@@ -1,6 +1,7 @@
 {
-  name = "temple-light";
+  label = "Temple Light";
   variant = "light";
+  style = "temple";
   palette = {
     base00 = "#f6f6f9";
     base01 = "#ececf2";
@@ -31,5 +32,10 @@
     sans = "Inter";
     mono = "Hack Nerd Font";
     size = 13;
+  };
+  window = {
+    border = 1;
+    active = ["#2f6fd6cc"];
+    inactive = ["#dcdce4aa"];
   };
 }

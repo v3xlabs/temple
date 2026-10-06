@@ -1,6 +1,7 @@
 {
-  name = "temple-dark";
+  label = "Temple Dark";
   variant = "dark";
+  style = "temple";
   palette = {
     base00 = "#0f0f14";
     base01 = "#1a1a22";
@@ -31,5 +32,10 @@
     sans = "Inter";
     mono = "Hack Nerd Font";
     size = 13;
+  };
+  window = {
+    border = 1;
+    active = ["#79b8ffcc"];
+    inactive = ["#26262faa"];
   };
 }

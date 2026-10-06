@@ -54,7 +54,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 implicitHeight: content.implicitHeight + 24
                 radius: Theme.radius
-                color: Qt.alpha(Theme.surface, Theme.surfaceOpacity + 0.15)
+                color: Qt.alpha(Theme.surface, Theme.panelOpacity)
                 border.color: card.modelData.urgency === NotificationUrgency.Critical ? Theme.accent : Theme.border
                 border.width: 1
 

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "../theme"
 
@@ -8,6 +9,9 @@ PanelWindow {
     id: root
 
     property bool open: false
+    property var commands: []
+
+    signal themesRequested
 
     function toggle() {
         open = !open;
@@ -17,30 +21,41 @@ PanelWindow {
         }
     }
 
-    readonly property var commands: [
+    readonly property var entries: [...commands.map(c => ({
+                    label: c.label,
+                    detail: "Command",
+                    run: () => Quickshell.execDetached(c.exec)
+                })),
         {
-            label: "Terminal",
-            exec: ["kitty"]
-        },
-        {
-            label: "Files",
-            exec: ["dolphin"]
-        },
-        {
-            label: "Editor",
-            exec: ["kate"]
+            label: "Change theme",
+            detail: Theme.label,
+            run: () => root.themesRequested()
         },
         {
             label: "Reload shell",
-            exec: ["qs", "ipc", "call", "shell", "reload"]
+            detail: "Command",
+            run: () => Quickshell.reload(true)
         },
-    ]
-    readonly property var matches: commands.filter(c => c.label.toLowerCase().includes(query.text.toLowerCase()))
+        ...DesktopEntries.applications.values.filter(app => !app.noDisplay).sort((a, b) => a.name.localeCompare(b.name)).map(app => ({
+                    label: app.name,
+                    detail: app.genericName,
+                    search: [app.genericName, ...app.keywords].join(" ").toLowerCase(),
+                    run: () => app.execute()
+                }))]
+    readonly property string needle: query.text.toLowerCase()
+    readonly property var matches: entries.filter(e => e.label.toLowerCase().includes(needle) || (e.search ?? "").includes(needle)).slice(0, 10)
     property int selected: 0
 
-    function run(command) {
-        Quickshell.execDetached(command.exec);
+    function run(entry) {
         open = false;
+        entry.run();
+    }
+
+    FileView {
+        path: Quickshell.env("TEMPLE_COMMANDS") || "/etc/temple/commands.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.commands = JSON.parse(text())
     }
 
     visible: open
@@ -68,7 +83,7 @@ PanelWindow {
         width: 560
         height: column.implicitHeight + 24
         radius: Theme.radius
-        color: Qt.alpha(Theme.surface, Theme.surfaceOpacity + 0.15)
+        color: Qt.alpha(Theme.surface, Theme.panelOpacity)
         border.color: Theme.border
         border.width: 1
 
@@ -117,7 +132,7 @@ PanelWindow {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
-                    radius: Theme.radius - 6
+                    radius: Math.max(Theme.radius - 6, 0)
                     color: row.index === root.selected ? Theme.selection : "transparent"
 
                     Text {
@@ -127,6 +142,16 @@ PanelWindow {
                         color: Theme.text
                         font.family: Theme.fontSans
                         font.pixelSize: Theme.fontSize + 1
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        text: row.modelData.detail ?? ""
+                        color: Theme.textMuted
+                        font.family: Theme.fontSans
+                        font.pixelSize: Theme.fontSize - 1
                     }
 
                     MouseArea {

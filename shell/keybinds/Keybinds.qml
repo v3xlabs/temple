@@ -58,7 +58,7 @@ PanelWindow {
         width: Math.min(parent.width - 80, 3 * 380 + 2 * 12 + 40)
         height: Math.min(parent.height - 80, content.implicitHeight + 40)
         radius: Theme.radius
-        color: Qt.alpha(Theme.surface, Theme.surfaceOpacity + 0.15)
+        color: Qt.alpha(Theme.surface, Theme.panelOpacity)
         border.color: Theme.border
         border.width: 1
         clip: true
