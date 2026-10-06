@@ -1,177 +1,586 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
+import Quickshell.Widgets
 import "../theme"
+import "../macos"
 
+// Popups for new notifications, stacked at the bar's end of the screen in the theme's layout.
+// Hiding a popup leaves the notification alive so the bell can still act on it.
 PanelWindow {
     id: root
 
     readonly property int defaultTimeout: 6000
+    readonly property var popup: Theme.notifications.popup
 
-    visible: server.trackedNotifications.values.length > 0
+    // Notification ids with a popup, newest first.
+    property var shown: []
+
+    readonly property var notifications: root.shown.map(id => NotificationStore.live(id)).filter(notification => notification !== null)
+    readonly property var popups: {
+        const popups = root.notifications.slice(0, root.popup.count);
+        // The newest popup sits nearest the bar.
+        return Theme.barEdge === "bottom" ? popups.reverse() : popups;
+    }
+
+    function hide(notification: Notification, expired: bool) {
+        root.shown = root.shown.filter(id => id !== notification.id && NotificationStore.live(id) !== null);
+        if (expired && notification.transient)
+            notification.expire();
+    }
+
+    visible: root.popups.length > 0
+    screen: Quickshell.screens.find(screen => screen.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
     WlrLayershell.namespace: "temple-notifications"
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Normal
 
     anchors {
-        top: true
+        top: Theme.barEdge === "top"
+        bottom: Theme.barEdge === "bottom"
         right: true
     }
     margins {
-        top: 8
+        top: root.popup.margin
+        bottom: root.popup.margin
         right: 8
     }
-    implicitWidth: 380
+    implicitWidth: root.popup.width
     implicitHeight: column.implicitHeight
     color: "transparent"
 
-    NotificationServer {
-        id: server
+    Connections {
+        target: NotificationStore
 
-        keepOnReload: true
-        actionsSupported: true
-        imageSupported: true
-        onNotification: notification => notification.tracked = true
+        function onPopupRequested(notification: Notification) {
+            root.shown = [notification.id, ...root.shown];
+        }
+
+        function onDoNotDisturbChanged() {
+            if (!NotificationStore.doNotDisturb)
+                return;
+            for (const notification of root.notifications)
+                root.hide(notification, true);
+            root.shown = [];
+        }
     }
 
-    ColumnLayout {
+    Column {
         id: column
 
         width: parent.width
         spacing: 8
 
         Repeater {
-            model: server.trackedNotifications
+            model: ScriptModel {
+                values: root.popups
+            }
 
-            Rectangle {
-                id: card
+            Item {
+                id: popup
 
                 required property Notification modelData
-                readonly property var defaultAction: modelData.actions.find(action => action.identifier === "default") ?? null
 
-                Layout.fillWidth: true
-                implicitHeight: content.implicitHeight + 24
-                radius: Theme.radius
-                color: Qt.alpha(Theme.surface, Theme.panelOpacity)
-                border.color: card.modelData.urgency === NotificationUrgency.Critical ? Theme.accent : Theme.border
-                border.width: 1
+                readonly property var defaultAction: NotificationStore.defaultAction(popup.modelData)
+                readonly property var buttons: popup.modelData.actions.filter(action => action.identifier !== "default")
+                readonly property bool critical: popup.modelData.urgency === NotificationUrgency.Critical
+                readonly property string icon: NotificationStore.iconSource(popup.modelData.image || popup.modelData.appIcon) || NotificationStore.fallbackIcon(popup.modelData.urgency)
+
+                function activate() {
+                    const action = popup.defaultAction;
+                    root.hide(popup.modelData, false);
+                    action?.invoke();
+                }
+
+                function invoke(action: NotificationAction) {
+                    root.hide(popup.modelData, false);
+                    action.invoke();
+                }
+
+                function dismiss() {
+                    root.hide(popup.modelData, false);
+                }
+
+                width: column.width
+                implicitHeight: view.implicitHeight
+
+                HoverHandler {
+                    id: hover
+                }
 
                 Timer {
-                    running: card.modelData.urgency !== NotificationUrgency.Critical && card.modelData.expireTimeout !== 0
-                    interval: card.modelData.expireTimeout > 0 ? card.modelData.expireTimeout : root.defaultTimeout
-                    onTriggered: card.modelData.expire()
+                    running: !popup.critical && popup.modelData.expireTimeout !== 0 && !hover.hovered
+                    interval: popup.modelData.expireTimeout > 0 ? popup.modelData.expireTimeout : root.defaultTimeout
+                    onTriggered: root.hide(popup.modelData, true)
                 }
 
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: popup.defaultAction ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: mouse => {
-                        if (mouse.button === Qt.LeftButton && card.defaultAction)
-                            card.defaultAction.invoke();
+                        if (mouse.button === Qt.LeftButton)
+                            popup.activate();
                         else
-                            card.modelData.dismiss();
+                            popup.dismiss();
                     }
                 }
 
-                RowLayout {
-                    id: content
+                Loader {
+                    id: view
 
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 12
+                    width: parent.width
+                    sourceComponent: ({
+                            balloon: balloon,
+                            toast: toast,
+                            banner: banner,
+                            window: textWindow
+                        })[root.popup.layout]
+                }
 
-                    Image {
-                        readonly property string icon: card.modelData.image || card.modelData.appIcon
+                // A text window with the app name in its border.
+                Component {
+                    id: textWindow
 
-                        visible: icon !== ""
-                        source: icon.startsWith("/") ? "file://" + icon : icon.includes("://") ? icon : Quickshell.iconPath(icon, true)
-                        sourceSize.width: 40
-                        sourceSize.height: 40
-                        Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        Layout.alignment: Qt.AlignTop
-                        fillMode: Image.PreserveAspectFit
-                    }
+                    TempleosFrame {
+                        id: textFrame
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: card.modelData.appName
-                            visible: text !== ""
-                            color: Theme.textMuted
-                            elide: Text.ElideRight
-                            font.family: Theme.fontSans
-                            font.pixelSize: Theme.fontSize - 2
-                        }
+                        implicitHeight: textContent.implicitHeight + 32
+                        title: popup.modelData.appName
+                        color: popup.critical ? root.popup.critical : root.popup.color
+                        background: root.popup.background
 
                         Text {
-                            Layout.fillWidth: true
-                            text: card.modelData.summary
-                            color: Theme.text
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                            font.family: Theme.fontSans
-                            font.pixelSize: Theme.fontSize + 1
-                            font.weight: Font.DemiBold
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: card.modelData.body
-                            visible: text !== ""
-                            textFormat: Text.PlainText
-                            color: Theme.text
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 5
-                            elide: Text.ElideRight
+                            anchors.right: parent.right
+                            anchors.rightMargin: 32
+                            height: 16
+                            text: "[X]"
+                            color: closeMouse.containsMouse ? textFrame.background : textFrame.color
                             font.family: Theme.fontSans
                             font.pixelSize: Theme.fontSize
+
+                            Rectangle {
+                                z: -1
+                                anchors.fill: parent
+                                color: closeMouse.containsMouse ? textFrame.color : textFrame.background
+                            }
+
+                            MouseArea {
+                                id: closeMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: popup.dismiss()
+                            }
                         }
 
-                        Flow {
-                            Layout.fillWidth: true
-                            visible: actions.count > 0
-                            spacing: 6
+                        ColumnLayout {
+                            id: textContent
 
-                            Repeater {
-                                id: actions
+                            x: 16
+                            y: 16
+                            width: textFrame.width - 32
+                            spacing: 0
 
-                                model: card.modelData.actions.filter(action => action.identifier !== "default")
+                            Text {
+                                Layout.fillWidth: true
+                                text: popup.modelData.summary
+                                visible: text !== ""
+                                color: textFrame.color
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                font.family: Theme.fontSans
+                                font.pixelSize: Theme.fontSize
+                            }
 
-                                Rectangle {
-                                    id: button
+                            Text {
+                                Layout.fillWidth: true
+                                text: popup.modelData.body
+                                visible: text !== ""
+                                textFormat: Text.PlainText
+                                color: textFrame.color
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 6
+                                elide: Text.ElideRight
+                                font.family: Theme.fontSans
+                                font.pixelSize: Theme.fontSize
+                            }
 
-                                    required property NotificationAction modelData
+                            Flow {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 8
+                                visible: popup.buttons.length > 0
+                                spacing: 16
 
-                                    width: label.implicitWidth + 20
-                                    height: 26
-                                    radius: Theme.radius - 6
-                                    color: hover.containsMouse ? Theme.selection : "transparent"
-                                    border.color: Theme.border
-                                    border.width: 1
+                                Repeater {
+                                    model: popup.buttons
+
+                                    NotificationButton {
+                                        required property NotificationAction modelData
+
+                                        text: modelData.text
+                                        onActivated: popup.invoke(modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Component {
+                    id: banner
+
+                    Glass {
+                        readonly property int inset: Math.max(10, Math.round(root.popup.radius / 2))
+
+                        implicitHeight: Math.max(bannerContent.implicitHeight, 38) + inset * 2
+                        radius: root.popup.radius
+
+                        RowLayout {
+                            id: bannerContent
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: parent.inset
+                            spacing: 10
+
+                            IconImage {
+                                implicitSize: 38
+                                source: popup.icon
+                                visible: popup.icon !== ""
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+
+                                RowLayout {
+                                    Layout.fillWidth: true
 
                                     Text {
-                                        id: label
+                                        Layout.fillWidth: true
+                                        text: popup.modelData.summary || popup.modelData.appName
+                                        color: root.popup.text
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: Theme.fontSize
+                                        font.weight: Font.DemiBold
+                                    }
 
-                                        anchors.centerIn: parent
-                                        text: button.modelData.text
-                                        color: Theme.text
+                                    Text {
+                                        text: "now"
+                                        color: root.popup.muted
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: Theme.fontSize - 1
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: popup.modelData.body
+                                    visible: text !== ""
+                                    textFormat: Text.PlainText
+                                    color: root.popup.text
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 4
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSize
+                                }
+
+                                Flow {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    visible: popup.buttons.length > 0
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: popup.buttons
+
+                                        NotificationButton {
+                                            required property NotificationAction modelData
+
+                                            text: modelData.text
+                                            onActivated: popup.invoke(modelData)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // The dismiss button appears at the top left corner under the pointer.
+                        CloseButton {
+                            x: 4
+                            y: 4
+                            visible: hover.hovered
+                            onActivated: popup.dismiss()
+                        }
+                    }
+                }
+
+                Component {
+                    id: balloon
+
+                    Item {
+                        id: balloonShape
+
+                        readonly property int tail: 18
+                        readonly property real bodyHeight: balloonContent.implicitHeight + 20
+
+                        implicitHeight: balloonShape.bodyHeight + balloonShape.tail
+
+                        Shape {
+                            anchors.fill: parent
+                            preferredRendererType: Shape.CurveRenderer
+
+                            ShapePath {
+                                strokeColor: root.popup.stroke
+                                strokeWidth: 1
+                                fillColor: root.popup.fill
+                                startX: 8.5
+                                startY: 0.5
+
+                                PathLine {
+                                    x: balloonShape.width - 8.5
+                                    y: 0.5
+                                }
+                                PathArc {
+                                    x: balloonShape.width - 0.5
+                                    y: 8.5
+                                    radiusX: 8
+                                    radiusY: 8
+                                }
+                                PathLine {
+                                    x: balloonShape.width - 0.5
+                                    y: balloonShape.bodyHeight - 8
+                                }
+                                PathArc {
+                                    x: balloonShape.width - 8.5
+                                    y: balloonShape.bodyHeight
+                                    radiusX: 8
+                                    radiusY: 8
+                                }
+                                // The tail points down at the tray.
+                                PathLine {
+                                    x: balloonShape.width - 30
+                                    y: balloonShape.bodyHeight
+                                }
+                                PathLine {
+                                    x: balloonShape.width - 22
+                                    y: balloonShape.bodyHeight + balloonShape.tail - 0.5
+                                }
+                                PathLine {
+                                    x: balloonShape.width - 54
+                                    y: balloonShape.bodyHeight
+                                }
+                                PathLine {
+                                    x: 8.5
+                                    y: balloonShape.bodyHeight
+                                }
+                                PathArc {
+                                    x: 0.5
+                                    y: balloonShape.bodyHeight - 8
+                                    radiusX: 8
+                                    radiusY: 8
+                                }
+                                PathLine {
+                                    x: 0.5
+                                    y: 8.5
+                                }
+                                PathArc {
+                                    x: 8.5
+                                    y: 0.5
+                                    radiusX: 8
+                                    radiusY: 8
+                                }
+                            }
+                        }
+
+                        ColumnLayout {
+                            id: balloonContent
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            spacing: 6
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                IconImage {
+                                    implicitSize: 16
+                                    source: popup.icon
+                                    visible: popup.icon !== ""
+                                    Layout.alignment: Qt.AlignTop
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: popup.modelData.summary || popup.modelData.appName
+                                    color: root.popup.text
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSize - 1
+                                    font.bold: true
+                                }
+
+                                CloseButton {
+                                    Layout.alignment: Qt.AlignTop
+                                    onActivated: popup.dismiss()
+                                }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: popup.modelData.body
+                                visible: text !== ""
+                                textFormat: Text.PlainText
+                                color: root.popup.text
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 6
+                                elide: Text.ElideRight
+                                font.family: Theme.fontSans
+                                font.pixelSize: Theme.fontSize - 1
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                visible: popup.buttons.length > 0
+                                spacing: 6
+
+                                Repeater {
+                                    model: popup.buttons
+
+                                    NotificationButton {
+                                        required property NotificationAction modelData
+
+                                        text: modelData.text
+                                        onActivated: popup.invoke(modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Component {
+                    id: toast
+
+                    Rectangle {
+                        implicitHeight: toastContent.implicitHeight + 24
+                        radius: 4
+                        color: root.popup.color
+                        border.color: popup.critical ? Theme.accent : root.popup.border
+                        border.width: 1
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 1
+                            height: parent.height / 2
+                            radius: 3
+                            gradient: Gradient {
+                                GradientStop {
+                                    position: 0
+                                    color: root.popup.sheen
+                                }
+                                GradientStop {
+                                    position: 1
+                                    color: "#00ffffff"
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            id: toastContent
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 12
+                            spacing: 12
+
+                            IconImage {
+                                implicitSize: 40
+                                source: popup.icon
+                                visible: popup.icon !== ""
+                                Layout.alignment: Qt.AlignTop
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: popup.modelData.appName
+                                        color: root.popup.appName
+                                        elide: Text.ElideRight
                                         font.family: Theme.fontSans
                                         font.pixelSize: Theme.fontSize - 1
                                     }
 
-                                    MouseArea {
-                                        id: hover
+                                    CloseButton {
+                                        onActivated: popup.dismiss()
+                                    }
+                                }
 
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: button.modelData.invoke()
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: popup.modelData.summary
+                                    color: root.popup.summary
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSize + 1
+                                    font.bold: true
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: popup.modelData.body
+                                    visible: text !== ""
+                                    textFormat: Text.PlainText
+                                    color: root.popup.body
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 5
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: Theme.fontSize
+                                }
+
+                                Flow {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    visible: popup.buttons.length > 0
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: popup.buttons
+
+                                        NotificationButton {
+                                            required property NotificationAction modelData
+
+                                            text: modelData.text
+                                            onActivated: popup.invoke(modelData)
+                                        }
                                     }
                                 }
                             }

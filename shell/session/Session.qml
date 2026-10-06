@@ -18,9 +18,10 @@ Singleton {
         Quickshell.execDetached(["systemctl", "suspend"]);
     }
 
-    // uwsm stops the graphical session units before the compositor exits.
+    // uwsm stops the graphical session units before the compositor exits; if
+    // uwsm cannot, ending the logind session still returns to the login screen.
     function logout() {
-        Quickshell.execDetached(["uwsm", "stop"]);
+        Quickshell.execDetached(["sh", "-c", "uwsm stop || loginctl terminate-session \"$XDG_SESSION_ID\""]);
     }
 
     function lock() {

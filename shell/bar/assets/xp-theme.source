@@ -1,0 +1,14 @@
+Windows XP Luna Blue visual-style resources.
+Source: https://archive.org/download/winxpluna/Themes/Luna/luna.msstyles
+Source SHA-256: dd8e86e5a7c19ea9fe0e34992babefe592055d68eb8659763c8300558ca5dcb4
+
+xp-taskbar.png: BLUE_TASKBARBACKGROUND_BMP, 50 x 28; native sizing margins left/right/top/bottom 0/0/15/11, tiled.
+xp-tray.png: BLUE_TASKBARTRAY_BMP, 110 x 28; sizing margins 34/10/12/12; content margins 19/7/0/0. The red transparent-color key is converted to alpha 0.
+xp-task-normal/hover/active/active-hover.png: BLUE_TASKBANDBUTTON_BMP, native 26 x 28 frames 0/1/4/5 of the 26 x 168 sheet. Sizing margins 17/5/15/8; content margins 0/4/4/4. Pressed frame 2 is identical to selected frame 4. The magenta transparent-color key is converted to alpha 0.
+
+xp-start-normal/hover/pressed.png: original English XP Start captures from Classic Shell XP_Button_ClearType.png (100 x 162).
+Source page: https://www.classicshell.net/forum/viewtopic.php?f=18&t=3206
+Download: http://www.classicshell.net/forum/download/file.php?id=1542
+Each 99 x 30 crop starts at x=0, y=12+54*state. Transparent blue-edge pixels reveal the Luna taskbar underneath. The original flag and GDI-rendered Start label remain baked into the bitmap; they are not resampled or repainted by Qt.
+
+Copyright and trademark Microsoft Corporation. The source archives supply no separate redistribution license.

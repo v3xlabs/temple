@@ -1,0 +1,8 @@
+singleton TrayStyle 1.0 TrayStyle.qml
+Volume 1.0 Volume.qml
+Network 1.0 Network.qml
+TrayPopup 1.0 TrayPopup.qml
+TrayTooltip 1.0 TrayTooltip.qml
+TrayRow 1.0 TrayRow.qml
+TrayIcon 1.0 TrayIcon.qml
+TrayButton 1.0 TrayButton.qml

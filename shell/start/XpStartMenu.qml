@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
@@ -39,6 +40,16 @@ PanelWindow {
         open = false;
     }
 
+    // The overlay covers one screen; a click on another screen or a window
+    // focused from elsewhere shows up as a focus change instead.
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (root.open && (event.name === "focusedmon" || (event.name === "activewindowv2" && event.data !== "")))
+                root.close();
+        }
+    }
+
     function openFolder(path: string) {
         close();
         Quickshell.execDetached(["xdg-open", path]);
@@ -55,10 +66,16 @@ PanelWindow {
         sessionDialog.show(target, mode);
     }
 
+    // Used by the launcher's session commands.
+    function confirmOn(target: ShellScreen, action: string) {
+        close();
+        sessionDialog.show(target, action === "logout" ? "logoff" : "shutdown");
+    }
+
     visible: open
     WlrLayershell.namespace: "temple-startmenu"
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Normal
 
     anchors {

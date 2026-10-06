@@ -1,0 +1,3 @@
+singleton BackgroundState 1.0 BackgroundState.qml
+Background 1.0 Background.qml
+BackgroundPicker 1.0 BackgroundPicker.qml

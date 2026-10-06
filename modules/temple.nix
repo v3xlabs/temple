@@ -13,6 +13,7 @@
       autostart = lib.optional cfg.kwallet.enable "${config.security.pam.services.login.kwallet.package}/libexec/pam_kwallet_init";
       hyprbars = pkgs.hyprlandPlugins.hyprbars;
       titlebarExclude = cfg.titlebars.exclude;
+      defaultTheme = cfg.theme;
       exe = {
         terminal = lib.getExe cfg.terminal;
         screenshot = lib.getExe screenshot;
@@ -30,7 +31,47 @@
       install -Dm444 -t $out/share/fonts/truetype ${pkgs.wineWow64Packages.fonts}/share/fonts/truetype/tahoma{,bd}.ttf
     '';
 
+    # Apple's San Francisco downloads: each dmg holds a pkg whose gzip payload
+    # is a cpio archive. 7z unwraps the dmg and pkg layers; cpio the payload.
+    # Only the static Text, Display and Mono cuts are kept: the variable SF-Pro.ttf would compete
+    # with them in fontconfig's matching.
+    sanFrancisco = let
+      dmg = name: hash:
+        pkgs.fetchurl {
+          url = "https://devimages-cdn.apple.com/design/resources/download/${name}.dmg";
+          inherit hash;
+        };
+      pro = dmg "SF-Pro" "sha256-loqzuLH5LC2K9h6waA9cIiTE541ZuYa/AEUCp/wBKRg=";
+      mono = dmg "SF-Mono" "sha256-bUoLeOOqzQb5E/ZCzq0cfbSvNO1IhW1xcaLgtV2aeUU=";
+    in
+      pkgs.runCommand "san-francisco" {nativeBuildInputs = [pkgs.p7zip pkgs.cpio];} ''
+        7z x -y -opro ${pro} >/dev/null
+        7z x -y -omono ${mono} >/dev/null
+        7z x -y -omono 'mono/SFMonoFonts/SF Mono Fonts.pkg' >/dev/null
+        for dir in pro mono; do
+          (cd $dir && cpio -idm --quiet < 'Payload~')
+        done
+        install -Dm444 -t $out/share/fonts/opentype pro/Library/Fonts/SF-Pro-{Text,Display}-*.otf mono/Library/Fonts/SF-Mono-*.otf
+      '';
+
+    templeosFont = pkgs.callPackage ./templeos-font.nix {};
+
     stateLink = "$HOME/.local/state/temple/theme";
+
+    # The icon theme is fixed on the binary itself: a shell restarted from a
+    # terminal lacks the session's environment and would draw missing icons.
+    shell = pkgs.symlinkJoin {
+      name = "temple-quickshell";
+      paths = [pkgs.quickshell];
+      nativeBuildInputs = [pkgs.makeWrapper];
+      postBuild = ''
+        for program in qs quickshell; do
+          wrapProgram $out/bin/$program \
+            --set-default QS_ICON_THEME breeze \
+            --prefix XDG_DATA_DIRS : ${pkgs.kdePackages.breeze-icons}/share
+        done
+      '';
+    };
 
     # Electron, Chromium and Qt pick the KDE wallet and platform theme only when
     # the desktop list names KDE. Hyprland stays first, so its portals win.
@@ -45,6 +86,11 @@
       if [ ! -e "${stateLink}/theme.json" ]; then
         mkdir -p "$HOME/.local/state/temple"
         ln -sfn /etc/temple/themes/${cfg.theme} "${stateLink}"
+      fi
+      # The chosen wallpaper; hyprlock reads it, the background picker replaces it.
+      if [ ! -e "$HOME/.local/state/temple/background" ]; then
+        mkdir -p "$HOME/.local/state/temple"
+        ln -sfn ${builtins.head cfg.backgrounds} "$HOME/.local/state/temple/background"
       fi
       exec ${config.programs.hyprland.package}/bin/start-hyprland
     '';
@@ -124,7 +170,7 @@
     hyprlockConfig = theme: ''
       background {
         monitor =
-        path = ${builtins.head cfg.backgrounds}
+        path = ~/.local/state/temple/background
         blur_passes = 3
       }
 
@@ -164,10 +210,28 @@
           type = lib.types.str;
           description = "Name the theme picker shows.";
         };
-        variant = lib.mkOption {type = lib.types.enum ["dark" "light"];};
         style = lib.mkOption {
-          type = lib.types.enum ["temple" "xp" "win7"];
-          description = "Bar the shell draws. Each style reads its own tokens from `bar`.";
+          type = lib.types.enum ["xp" "win7" "macos" "templeos"];
+          description = "Desktop the bar, start menu and session dialogs imitate. Skins of one style read the same tokens from `bar`.";
+        };
+        skin = lib.mkOption {
+          type = lib.types.enum ["drawn" "msstyles" "sequoia" "tahoe"];
+          default = "drawn";
+          description = "How the bar is painted: `drawn` from gradients and the `bar` tokens, `msstyles` from bitmaps of the original Windows visual style. The `macos` style names the macOS release it follows: `sequoia` (macOS 15, translucent menu bar) or `tahoe` (macOS 26, Liquid Glass); both draw from the `bar` tokens.";
+        };
+        edge = lib.mkOption {
+          type = lib.types.enum ["top" "bottom"];
+          description = "Screen edge the bar sits on. Flyouts and notifications open away from it, and `temple.bar.monitors` has one list per edge.";
+        };
+        frame = lib.mkOption {
+          type = lib.types.enum ["plain" "glass" "text"];
+          default = "plain";
+          description = "How tray flyouts and the notification centre are framed: `plain` from their `color`, `border` and `radius` tokens, `glass` as the macOS material from the `bar` tokens, `text` as a TempleOS text-mode border.";
+        };
+        lineWidth = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 1;
+          description = "Thickness of separator lines in flyouts and the notification centre.";
         };
         palette = lib.mkOption {
           type = base16;
@@ -191,6 +255,11 @@
           sans = lib.mkOption {type = lib.types.str;};
           mono = lib.mkOption {type = lib.types.str;};
           size = lib.mkOption {type = lib.types.ints.positive;};
+          bitmap = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "The sans font is a bitmap font: flyouts and notifications draw text only at `size` and never bold.";
+          };
         };
         window = {
           border = lib.mkOption {type = lib.types.ints.unsigned;};
@@ -199,6 +268,11 @@
             description = "Active window border. More than one colour draws a gradient.";
           };
           inactive = lib.mkOption {type = lib.types.nonEmptyListOf colour;};
+          rounding = lib.mkOption {
+            type = lib.types.ints.unsigned;
+            default = 0;
+            description = "Corner radius of windows in pixels.";
+          };
           titlebar = let
             token = default:
               lib.mkOption {
@@ -212,12 +286,27 @@
             buttonText = token config.palette.base05;
             close = token config.palette.base08;
             closeText = token config.palette.base00;
+            minimize = token config.window.titlebar.button;
+            maximize = token config.window.titlebar.button;
+            align = lib.mkOption {
+              type = lib.types.enum ["left" "right"];
+              default = "right";
+              description = "Edge of the title bar that holds the buttons. `left` orders them close, minimize, maximize from the edge, like macOS.";
+            };
           };
         };
         bar = lib.mkOption {
           type = lib.types.attrsOf (lib.types.oneOf [lib.types.str lib.types.number]);
           default = {};
           description = "Tokens for the bar style.";
+        };
+        tray = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          description = "Tokens for the tray icons, flyouts, tooltips and the volume and network flyouts. See themes/xp.nix for the full set.";
+        };
+        notifications = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          description = "Tokens for notification popups, the notification centre, action buttons and close buttons. See themes/xp.nix for the full set.";
         };
       };
     });
@@ -239,7 +328,7 @@
 
       theme = lib.mkOption {
         type = lib.types.str;
-        default = "dark";
+        default = "win7-black";
         description = "Theme a user starts with until they pick another one. The pick is kept in ~/.local/state/temple/theme.";
       };
 
@@ -311,13 +400,13 @@
           type = lib.types.listOf lib.types.str;
           default = [];
           example = ["DP-5"];
-          description = "Outputs that show a bar at the top edge (style `temple`), by connector name as `hyprctl monitors` prints it. An empty list shows it on every output.";
+          description = "Outputs that show a bar at the top edge, by connector name as `hyprctl monitors` prints it. An empty list shows it on every output. The XP and Windows 7 themes draw no top bar.";
         };
         bottom = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [];
           example = ["DP-4"];
-          description = "Outputs that show a bar at the bottom edge (styles `xp` and `win7`). An empty list shows it on every output.";
+          description = "Outputs that show a bar at the bottom edge, such as the XP and Windows 7 taskbars. An empty list shows it on every output.";
         };
       };
 
@@ -437,13 +526,15 @@
           applyTheme
           lock
           screenshot
-          quickshell
+          shell
           cfg.terminal
           kdePackages.breeze
           kdePackages.breeze-icons
           kdePackages.dolphin
           kdePackages.kate
           wl-clipboard
+          pavucontrol
+          networkmanagerapplet
         ]
         ++ lib.optional cfg.kwallet.enable kdePackages.kwallet;
 
@@ -452,6 +543,8 @@
         nerd-fonts.hack
         open-sans
         tahoma
+        sanFrancisco
+        templeosFont
       ];
 
       systemd.user.services = {

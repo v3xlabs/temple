@@ -224,7 +224,7 @@ PanelWindow {
 
                 ActionButton {
                     visible: root.mode === "logoff"
-                    label: "Switch User"
+                    label: "Lock"
                     icon: "system-lock-screen"
                     tint: "#3ba32b"
                     onActivated: {

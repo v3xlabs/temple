@@ -7,7 +7,9 @@
   autostart,
   hyprbars,
   titlebarExclude,
+  defaultTheme,
 }: let
+  titlebarHeight = 26;
   monitorRule = m: "hl.monitor({ output = ${builtins.toJSON m.output}, mode = ${builtins.toJSON m.mode}, position = ${builtins.toJSON m.position}, scale = ${builtins.toJSON (toString m.scale)} })";
 
   modifiers = {
@@ -48,6 +50,7 @@
       "SUPER + slash" = bind ''hl.dsp.global("temple:keybinds")'' "Show keybinds";
       "SUPER + K" = bind ''hl.dsp.global("temple:palette")'' "Command palette";
       "SUPER + T" = bind ''hl.dsp.global("temple:themes")'' "Pick theme";
+      "SUPER + B" = bind ''hl.dsp.global("temple:backgrounds")'' "Pick background";
       "SUPER + L" = bind (exec "temple-lock") "Lock";
       "SUPER + Return" = bind (exec exe.terminal) "Terminal";
       "ALT + K" = bind (exec exe.terminal) "Terminal";
@@ -145,6 +148,14 @@ in {
     t = theme.window.titlebar;
     button = bg: fg: icon: action: "hl.plugin.hyprbars.add_button({ bg_color = ${builtins.toJSON (rgba bg)}, fg_color = ${builtins.toJSON (rgba fg)}, size = 16, icon = ${builtins.toJSON icon}, action = ${builtins.toJSON action} })";
     eval = code: "hyprctl eval '${code}'";
+    close = button t.close t.closeText "×" (eval "hl.dispatch(hl.dsp.window.close())");
+    maximize = button t.maximize t.buttonText "□" (eval ''hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))'');
+    minimize = button t.minimize t.buttonText "–" (eval "temple.minimize(hl.get_active_window().address)");
+    # The first button added sits nearest the aligned edge.
+    buttons =
+      if t.align == "left"
+      then [close minimize maximize]
+      else [close maximize minimize];
   in ''
     hl.config({
       general = {
@@ -155,6 +166,7 @@ in {
         },
       },
       decoration = {
+        rounding = ${toString theme.window.rounding},
         blur = { enabled = ${lib.boolToString (theme.glass.blur > 0)}, size = ${toString theme.glass.blur}, passes = 3, vibrancy = 0.2 },
       },
       misc = { background_color = 0xff${lib.removePrefix "#" theme.palette.base00} },
@@ -165,11 +177,11 @@ in {
       hl.config({
         plugin = {
           hyprbars = {
-            bar_height = 26,
+            bar_height = ${toString titlebarHeight},
             bar_color = ${builtins.toJSON (rgba t.color)},
             bar_text_font = ${builtins.toJSON theme.font.sans},
             bar_text_size = ${toString (theme.font.size - 1)},
-            bar_buttons_alignment = "right",
+            bar_buttons_alignment = ${builtins.toJSON t.align},
             bar_part_of_window = true,
             bar_precedence_over_border = true,
             on_double_click = ${builtins.toJSON (eval ''hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))'')},
@@ -177,10 +189,7 @@ in {
           },
         },
       })
-      -- The first button added sits furthest right.
-      ${button t.close t.closeText "×" (eval "hl.dispatch(hl.dsp.window.close())")}
-      ${button t.button t.buttonText "□" (eval ''hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))'')}
-      ${button t.button t.buttonText "–" (eval "temple.minimize(hl.get_active_window().address)")}
+      ${lib.concatStringsSep "\n      " buttons}
     end
   '';
 
@@ -189,7 +198,6 @@ in {
 
     hl.env("XCURSOR_THEME", "breeze_cursors")
     hl.env("XCURSOR_SIZE", "24")
-    hl.env("QS_ICON_THEME", "breeze")
     hl.env("QT_QPA_PLATFORM", "wayland")
     hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 
@@ -220,11 +228,22 @@ in {
     -- Hyprland loads the listed plugins after each parse and unloads any no longer listed.
     hl.plugin.load("${hyprbars}/lib/libhyprbars.so")
     -- Apps that draw their own title bar.
+    temple_titlebar_height = ${toString titlebarHeight}
+    hl.window_rule({ name = "temple-own-titlebar-tag", match = { class = ${builtins.toJSON "^(${lib.concatStringsSep "|" titlebarExclude})$"} }, tag = "+own-titlebar" })
     if hl.plugin.hyprbars then
-      hl.window_rule({ name = "temple-own-titlebar", match = { class = ${builtins.toJSON "^(${lib.concatStringsSep "|" titlebarExclude})$"} }, ["hyprbars:no_bar"] = true })
+      hl.window_rule({ name = "temple-own-titlebar", match = { tag = "own-titlebar" }, ["hyprbars:no_bar"] = true })
     end
 
-    dofile(os.getenv("HOME") .. "/.local/state/temple/theme/hyprland.lua")
+    -- A rebuild that removes the linked theme leaves the link dangling until the
+    -- shell relinks it; the default theme keeps the binds registered meanwhile.
+    local theme_lua = os.getenv("HOME") .. "/.local/state/temple/theme/hyprland.lua"
+    local linked = io.open(theme_lua)
+    if linked then
+      linked:close()
+    else
+      theme_lua = "/etc/temple/themes/${defaultTheme}/hyprland.lua"
+    end
+    dofile(theme_lua)
 
     hl.curve("temple", { type = "bezier", points = { { 0.2, 0.9 }, { 0.1, 1 } } })
     hl.animation({ leaf = "windows", enabled = true, speed = 1, bezier = "temple", style = "popin 95%" })

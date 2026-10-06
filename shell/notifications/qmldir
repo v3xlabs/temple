@@ -1,0 +1,5 @@
+singleton NotificationStore 1.0 NotificationStore.qml
+Notifications 1.0 Notifications.qml
+NotificationBell 1.0 NotificationBell.qml
+NotificationButton 1.0 NotificationButton.qml
+CloseButton 1.0 CloseButton.qml

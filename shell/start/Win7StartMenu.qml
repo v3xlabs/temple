@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
@@ -59,6 +60,16 @@ PanelWindow {
         powerMenuOpen = false;
     }
 
+    // The overlay covers one screen; a click on another screen or a window
+    // focused from elsewhere shows up as a focus change instead.
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (root.open && (event.name === "focusedmon" || (event.name === "activewindowv2" && event.data !== "")))
+                root.close();
+        }
+    }
+
     function act(run) {
         close();
         run();
@@ -69,7 +80,11 @@ PanelWindow {
     }
 
     function confirm(action: string) {
-        const target = screen;
+        confirmOn(screen, action);
+    }
+
+    // Also used by the launcher's session commands.
+    function confirmOn(target: ShellScreen, action: string) {
         close();
         dialog.show(target, action);
     }
@@ -82,7 +97,7 @@ PanelWindow {
     visible: open
     WlrLayershell.namespace: "temple-startmenu"
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Normal
 
     anchors {
@@ -537,11 +552,6 @@ PanelWindow {
 
                 Repeater {
                     model: [
-                        {
-                            label: "Switch user",
-                            icon: "system-switch-user",
-                            run: () => root.lock()
-                        },
                         {
                             label: "Log off",
                             icon: "system-log-out",

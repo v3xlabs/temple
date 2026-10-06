@@ -69,6 +69,14 @@ local function place(box)
   hl.dispatch(hl.dsp.window.move({ x = box.x, y = box.y }))
 end
 
+-- Title bars sit above a window's own geometry, so a window filling a screen
+-- area starts one bar lower. Windows that draw their own bar carry the tag.
+local function inside(box, window)
+  local tags = type(window.tags) == "table" and table.concat(window.tags, " ") or tostring(window.tags or "")
+  local bar = (hl.plugin.hyprbars and window.fullscreen == 0 and not tags:find("own-titlebar", 1, true)) and temple_titlebar_height or 0
+  return { x = box.x, y = box.y + bar, w = box.w, h = box.h - bar }
+end
+
 -- Clients may round their size a few pixels, so geometry matches loosely.
 local function occupies(window, box)
   local function near(a, b)
@@ -84,7 +92,7 @@ local function snap_to(window, monitor, side, restore)
   if monitor.name ~= window.monitor.name then
     hl.dispatch(hl.dsp.window.move({ monitor = monitor.name }))
   end
-  local box = half(monitor, side)
+  local box = inside(half(monitor, side), window)
   place(box)
   snapped[window.address] = { monitor = monitor.name, side = side, box = box, restore = restore }
 end
@@ -159,12 +167,12 @@ function temple.release()
   if (left or right) and (top or bottom) then
     local area = workarea(monitor)
     local w, h = math.floor(area.w / 2), math.floor(area.h / 2)
-    local box = {
+    local box = inside({
       x = left and area.x or area.x + w,
       y = top and area.y or area.y + h,
       w = left and w or area.w - w,
       h = top and h or area.h - h,
-    }
+    }, window)
     if monitor.name ~= window.monitor.name then
       hl.dispatch(hl.dsp.window.move({ monitor = monitor.name }))
     end

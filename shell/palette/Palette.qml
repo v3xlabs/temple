@@ -12,6 +12,9 @@ PanelWindow {
     property bool open: false
 
     signal themesRequested
+    signal backgroundsRequested
+    // action: "shutdown", "reboot", "logout" or "suspend".
+    signal sessionRequested(string action)
 
     function toggle() {
         open = !open;
@@ -33,6 +36,18 @@ PanelWindow {
             icon: "preferences-desktop-theme",
             run: () => root.themesRequested()
         },
+        {
+            label: "Change background",
+            detail: "Command",
+            icon: "preferences-desktop-wallpaper",
+            run: () => root.backgroundsRequested()
+        },
+        ...[["Log out", "logout", "system-log-out"], ["Restart", "reboot", "system-reboot"], ["Shut down", "shutdown", "system-shutdown"], ["Sleep", "suspend", "system-suspend"]].map(([label, action, icon]) => ({
+                    label: label,
+                    detail: "Session",
+                    icon: icon,
+                    run: () => root.sessionRequested(action)
+                })),
         {
             label: "Reload shell",
             detail: "Command",

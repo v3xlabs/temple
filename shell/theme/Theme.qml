@@ -12,13 +12,28 @@ Singleton {
     // Bar tokens of the last theme seen per style. A bar keeps reading its own
     // style's tokens while its loader tears it down after a style switch.
     property var barTokens: ({})
+    // The linked theme was removed by a rebuild; it is replaced by the default once the themes load.
+    property bool linkBroken: false
+
+    function relink() {
+        if (!linkBroken || !(fallback in themes))
+            return;
+        linkBroken = false;
+        set(fallback);
+    }
 
     readonly property var names: Object.keys(themes)
     readonly property var data: themes[name] ?? ({})
+    readonly property bool ready: name in themes
+    readonly property string barEdge: data.edge ?? "bottom"
+    readonly property string frame: data.frame ?? "plain"
+    readonly property int lineWidth: data.lineWidth ?? 1
+    readonly property var tray: data.tray ?? ({})
+    readonly property var notifications: data.notifications ?? ({})
 
     readonly property string label: data.label ?? name
-    readonly property string style: data.style ?? "temple"
-    readonly property string variant: data.variant ?? "dark"
+    readonly property string style: data.style ?? ""
+    readonly property string skin: data.skin ?? "drawn"
     readonly property var palette: data.palette ?? ({})
     readonly property color accent: data.accent ?? "#79b8ff"
     readonly property color surface: data.glass?.tint ?? "#14141c"
@@ -32,6 +47,12 @@ Singleton {
     readonly property string fontSans: data.font?.sans ?? "sans-serif"
     readonly property string fontMono: data.font?.mono ?? "monospace"
     readonly property int fontSize: data.font?.size ?? 13
+    readonly property bool fontBitmap: data.font?.bitmap ?? false
+
+    // A bitmap font stays sharp only at its own size.
+    function textSize(step: int): int {
+        return fontBitmap ? fontSize : fontSize + step;
+    }
 
     // Recolors the shell at once and syncs Hyprland, kitty and hyprlock shortly after.
     function set(next: string): bool {
@@ -76,6 +97,7 @@ Singleton {
             // Tokens first: a bar loads the moment `themes` names its style.
             root.select(root.name in themes ? root.name : root.fallback, themes);
             root.themes = themes;
+            root.relink();
         }
     }
 
@@ -89,11 +111,16 @@ Singleton {
             else if (active in root.themes)
                 root.select(active);
         }
+        onLoadFailed: {
+            root.linkBroken = true;
+            root.relink();
+        }
     }
 
     Timer {
         id: applyDelay
-        interval: 120
+        // Each apply reloads Hyprland; browsing quickly should only reload once.
+        interval: 250
         onTriggered: {
             if (apply.running)
                 apply.pending = true;

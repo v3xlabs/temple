@@ -1,0 +1,15 @@
+Windows 7 SP1 Aero visual-style resources.
+Source: https://archive.org/details/windows-7-aeromsstyles
+Download: https://archive.org/download/windows-7-aeromsstyles/aero.msstyles
+File version: 6.1.7601.17514 (win7sp1_rtm.101119-1850)
+File SHA-256: 6da5ef369e56d81ba737b65d69a3316d40096e52b1a1bedb87a90f5dbf6925e2
+
+win7-taskbar.png: IMAGE 845, TaskBar2Composited::TaskBar BACKGROUNDBOTTOM, 1 x 3, top sizing margin 2.
+win7-task-1..6.png: IMAGE 1014, TaskBand2 TASKITEM, native 60 x 40 frames 1..6 of the 60 x 400 sheet. Sizing margins left/right/top/bottom 3/3/3/3; content margins 10/10/4/4.
+win7-desktop-normal/hover/pressed.png: IMAGE 1107, ShowDesktop::Button, native 17 x 40 frames. Sizing margins 2/2/15/2.
+win7-clock-normal/hover/pressed.png: IMAGE 1060, TrayNotify::Clock, native 55 x 29 frames. Sizing margins 2/2/14/14; content margins 5/4/0/0.
+
+The original IMAGE PNG resources use premultiplied RGB despite the PNG format. Exported PNGs convert RGB to straight alpha and preserve alpha. Frames are cropped without resampling.
+Alpha convention reference: https://github.com/nptr/msstyleEditor/blob/master/libmsstyle/ImageConverter.cs
+
+Copyright Microsoft Corporation. All rights reserved. The source archive supplies no separate redistribution license.

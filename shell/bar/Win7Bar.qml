@@ -7,6 +7,8 @@ import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../theme"
 import "../activate"
+import "../tray"
+import "../notifications"
 import "../windows"
 
 PanelWindow {
@@ -256,6 +258,21 @@ PanelWindow {
         Row {
             Layout.alignment: Qt.AlignVCenter
             spacing: 6
+
+            NotificationBell {
+                anchors.verticalCenter: parent.verticalCenter
+                size: 16
+            }
+
+            Network {
+                anchors.verticalCenter: parent.verticalCenter
+                size: 16
+            }
+
+            Volume {
+                anchors.verticalCenter: parent.verticalCenter
+                size: 16
+            }
 
             ActivateToggle {
                 anchors.verticalCenter: parent.verticalCenter

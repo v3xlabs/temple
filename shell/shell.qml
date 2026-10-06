@@ -17,7 +17,7 @@ import "start"
 ShellRoot {
     id: shell
 
-    readonly property var barScreens: Config.barMonitors[Theme.style === "temple" ? "top" : "bottom"] ?? []
+    readonly property var barScreens: Config.barMonitors[Theme.barEdge] ?? []
     readonly property var watermarkScreens: Config.activateLinuxMonitors
 
     Variants {
@@ -35,6 +35,7 @@ ShellRoot {
         Bar {
             required property ShellScreen modelData
             screen: modelData
+            startOpen: startMenu.openScreen === modelData
             onStartRequested: startMenu.toggle(modelData)
         }
     }
@@ -57,6 +58,12 @@ ShellRoot {
     Palette {
         id: palette
         onThemesRequested: themePicker.show()
+        onBackgroundsRequested: backgroundPicker.toggle()
+        onSessionRequested: action => startMenu.confirm(action)
+    }
+
+    BackgroundPicker {
+        id: backgroundPicker
     }
 
     ThemePicker {
@@ -72,7 +79,12 @@ ShellRoot {
         keybinds: keybinds.keybinds
     }
 
-    Notifications {}
+    // Popups read theme tokens from their first binding.
+    LazyLoader {
+        active: Theme.ready
+
+        Notifications {}
+    }
 
     GlobalShortcut {
         appid: "temple"
@@ -93,6 +105,13 @@ ShellRoot {
         name: "themes"
         description: "Toggle the theme picker"
         onPressed: themePicker.toggle()
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "backgrounds"
+        description: "Toggle the background picker"
+        onPressed: backgroundPicker.toggle()
     }
 
     GlobalShortcut {

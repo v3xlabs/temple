@@ -1,0 +1,107 @@
+pragma ComponentBehavior: Bound
+import QtQuick
+import Quickshell
+import Quickshell.Hyprland
+import "../frame"
+
+// A flyout attached to a tray icon. It opens away from the bar and right-aligns with the icon.
+PopupWindow {
+    id: popup
+
+    required property Item trigger
+    property int panelWidth: 260
+    property int padding: TrayStyle.popup.padding
+    default property alias content: body.data
+
+    // Distance between the bar edge and the flyout.
+    readonly property int gap: 4
+    property double closedAt: 0
+
+    function toggle() {
+        if (visible) {
+            visible = false;
+            return;
+        }
+        // A click on the tray icon first clears the focus grab and closes the flyout; it must not reopen it.
+        if (Date.now() - closedAt < 250)
+            return;
+        const position = trigger.mapToItem(null, 0, 0);
+        anchor.rect.x = 0;
+        anchor.rect.y = -position.y;
+        anchor.rect.width = trigger.width;
+        anchor.rect.height = trigger.Window.height;
+        visible = true;
+        keys.forceActiveFocus();
+    }
+
+    anchor.item: trigger
+    anchor.edges: TrayStyle.opensDown ? Edges.Bottom | Edges.Right : Edges.Top | Edges.Right
+    anchor.gravity: TrayStyle.opensDown ? Edges.Bottom | Edges.Left : Edges.Top | Edges.Left
+    anchor.adjustment: PopupAdjustment.Slide
+    implicitWidth: panelWidth
+    implicitHeight: body.implicitHeight + padding * 2 + gap
+    color: "transparent"
+    onVisibleChanged: {
+        if (!visible)
+            closedAt = Date.now();
+    }
+
+    // A grab requested before the popup maps never activates.
+    HyprlandFocusGrab {
+        windows: [popup]
+        active: popup.backingWindowVisible
+        onCleared: popup.visible = false
+    }
+
+    Item {
+        id: keys
+
+        anchors.fill: parent
+        focus: true
+        Keys.onEscapePressed: popup.visible = false
+
+        Item {
+            id: frame
+
+            anchors.fill: parent
+            anchors.topMargin: TrayStyle.opensDown ? popup.gap : 0
+            anchors.bottomMargin: TrayStyle.opensDown ? 0 : popup.gap
+
+            Frame {
+                anchors.fill: parent
+                color: TrayStyle.popup.color
+                border: TrayStyle.popup.border
+                radius: TrayStyle.popup.radius
+            }
+
+            // Aero sheen across the top of the glass.
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 1
+                height: 48
+                radius: 5
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: TrayStyle.popup.sheen
+                    }
+                    GradientStop {
+                        position: 1
+                        color: Qt.alpha(TrayStyle.popup.sheen, 0)
+                    }
+                }
+            }
+
+            Column {
+                id: body
+
+                x: popup.padding
+                y: popup.padding
+                width: frame.width - popup.padding * 2
+                spacing: 4
+            }
+        }
+    }
+}
