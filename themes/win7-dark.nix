@@ -38,6 +38,14 @@
     border = 1;
     active = ["#6fa8dc88" "#2a5a8a88"];
     inactive = ["#3a4a5a55"];
+    titlebar = {
+      color = "#1c2733";
+      text = "#e6edf5";
+      button = "#2a3646";
+      buttonText = "#e6edf5";
+      close = "#c42b1c";
+      closeText = "#ffffff";
+    };
   };
   bar = {
     height = 40;

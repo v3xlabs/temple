@@ -4,6 +4,9 @@
   input,
   keybinds,
   exe,
+  autostart,
+  hyprbars,
+  titlebarExclude,
 }: let
   monitorRule = m: "hl.monitor({ output = ${builtins.toJSON m.output}, mode = ${builtins.toJSON m.mode}, position = ${builtins.toJSON m.position}, scale = ${builtins.toJSON (toString m.scale)} })";
 
@@ -24,7 +27,6 @@
     else bindKey (map (m: modifiers.${m}) mods) (lib.replaceStrings [" "] ["_"] (lib.last parts));
 
   exec = command: "hl.dsp.exec_cmd(${builtins.toJSON command})";
-  cycle = next: "function() hl.dispatch(hl.dsp.window.cycle_next({ next = ${lib.boolToString next} })) hl.dispatch(hl.dsp.window.bring_to_top()) end";
   bind = action: description: {
     inherit action description;
     flags = {};
@@ -65,18 +67,18 @@
       "SUPER + Q" = bind "hl.dsp.window.close()" "Close window";
       "SUPER + F" = bind "hl.dsp.window.fullscreen()" "Fullscreen";
       "SUPER + Up" = bind ''hl.dsp.window.fullscreen({ mode = "maximized", action = "set" })'' "Maximize";
-      "SUPER + Down" = bind ''hl.dsp.window.fullscreen({ mode = "maximized", action = "unset" })'' "Restore";
-      "SUPER + V" = bind "hl.dsp.window.float()" "Toggle floating";
-      "SUPER + Left" = bind ''hl.dsp.window.move({ direction = "left" })'' "Move window left";
-      "SUPER + Right" = bind ''hl.dsp.window.move({ direction = "right" })'' "Move window right";
-      "SUPER + SHIFT + Left" = bind ''hl.dsp.window.move({ monitor = "-1" })'' "Send window to previous monitor";
-      "SUPER + SHIFT + Right" = bind ''hl.dsp.window.move({ monitor = "+1" })'' "Send window to next monitor";
-      "SUPER + SHIFT + Up" = bind ''hl.dsp.window.move({ direction = "up" })'' "Move window up";
-      "SUPER + SHIFT + Down" = bind ''hl.dsp.window.move({ direction = "down" })'' "Move window down";
+      "SUPER + Down" = bind "temple.down" "Restore, then minimize";
+      "SUPER + V" = bind "hl.dsp.window.float()" "Toggle tiling";
+      "SUPER + Left" = bind "temple.snap(-1)" "Snap window left";
+      "SUPER + Right" = bind "temple.snap(1)" "Snap window right";
+      "SUPER + SHIFT + Left" = bind ''hl.dsp.window.move({ monitor = "l" })'' "Send window to the screen on the left";
+      "SUPER + SHIFT + Right" = bind ''hl.dsp.window.move({ monitor = "r" })'' "Send window to the screen on the right";
+      "SUPER + SHIFT + Up" = bind ''hl.dsp.window.move({ monitor = "u" })'' "Send window to the screen above";
+      "SUPER + SHIFT + Down" = bind ''hl.dsp.window.move({ monitor = "d" })'' "Send window to the screen below";
       "SUPER + SHIFT + R" = bind (exec "hyprctl reload") "Reload Hyprland config";
       "SUPER + SHIFT + M" = bind "hl.dsp.exit()" "Exit Temple";
-      "ALT + Tab" = bind (cycle true) "Next window";
-      "ALT + SHIFT + Tab" = bind (cycle false) "Previous window";
+      "ALT + Tab" = bind ''hl.dsp.global("temple:switcher-next")'' "Switch to the next window";
+      "ALT + SHIFT + Tab" = bind ''hl.dsp.global("temple:switcher-previous")'' "Switch to the previous window";
     }
     // lib.genAttrs' directions (d: lib.nameValuePair (bindKey ["SUPER" "CTRL"] (lib.toSentenceCase d)) (bind ''hl.dsp.focus({ direction = "${d}" })'' "Focus ${d}"))
     // lib.genAttrs' workspaces (i: lib.nameValuePair (bindKey ["SUPER"] i) (bind "hl.dsp.focus({ workspace = ${i} })" "Workspace ${i}"))
@@ -96,6 +98,19 @@
   mouseBinds = {
     "SUPER + mouse:272" = bind "hl.dsp.window.drag()" "Move window with the mouse" // {flags.mouse = true;};
     "SUPER + mouse:273" = bind "hl.dsp.window.resize()" "Resize window with the mouse" // {flags.mouse = true;};
+  };
+
+  # A bare modifier press reaches the shell, which lists the binds that start
+  # with it. Non-consuming keeps the modifier working everywhere. Releases come
+  # from the key hook in the main config instead.
+  hintBinds = let
+    hint = name:
+      bind ''hl.dsp.global("temple:hint-${name}")'' "Key hint"
+      // {flags.non_consuming = true;};
+  in {
+    "Super_L" = hint "super";
+    "Super_R" = hint "super";
+    "Alt_L" = hint "alt";
   };
 
   displayKey = key:
@@ -123,9 +138,14 @@ in {
     inherit (b) description;
   }) (binds // mouseBinds);
 
-  # Hyprland options a theme owns. The main config runs this file at start
-  # and reload, and temple-apply-theme evaluates it in the running compositor.
-  themeLua = theme: ''
+  # Hyprland options a theme owns. The main config runs this file at start and
+  # on every reload; temple-apply-theme switches themes with a reload, because
+  # title bar buttons can only be added, and a reload clears them first.
+  themeLua = theme: let
+    t = theme.window.titlebar;
+    button = bg: fg: icon: action: "hl.plugin.hyprbars.add_button({ bg_color = ${builtins.toJSON (rgba bg)}, fg_color = ${builtins.toJSON (rgba fg)}, size = 16, icon = ${builtins.toJSON icon}, action = ${builtins.toJSON action} })";
+    eval = code: "hyprctl eval '${code}'";
+  in ''
     hl.config({
       general = {
         border_size = ${toString theme.window.border},
@@ -139,6 +159,29 @@ in {
       },
       misc = { background_color = 0xff${lib.removePrefix "#" theme.palette.base00} },
     })
+
+    -- The title bar plugin loads after the first parse, which then runs again.
+    if hl.plugin.hyprbars then
+      hl.config({
+        plugin = {
+          hyprbars = {
+            bar_height = 26,
+            bar_color = ${builtins.toJSON (rgba t.color)},
+            bar_text_font = ${builtins.toJSON theme.font.sans},
+            bar_text_size = ${toString (theme.font.size - 1)},
+            bar_buttons_alignment = "right",
+            bar_part_of_window = true,
+            bar_precedence_over_border = true,
+            on_double_click = ${builtins.toJSON (eval ''hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))'')},
+            col = { text = ${builtins.toJSON (rgba t.text)} },
+          },
+        },
+      })
+      -- The first button added sits furthest right.
+      ${button t.close t.closeText "×" (eval "hl.dispatch(hl.dsp.window.close())")}
+      ${button t.button t.buttonText "□" (eval ''hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))'')}
+      ${button t.button t.buttonText "–" (eval "temple.minimize(hl.get_active_window().address)")}
+    end
   '';
 
   lua = ''
@@ -146,6 +189,7 @@ in {
 
     hl.env("XCURSOR_THEME", "breeze_cursors")
     hl.env("XCURSOR_SIZE", "24")
+    hl.env("QS_ICON_THEME", "breeze")
     hl.env("QT_QPA_PLATFORM", "wayland")
     hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 
@@ -153,6 +197,10 @@ in {
       general = {
         gaps_in = 0,
         gaps_out = 0,
+        -- Borders are 1px, so the grab area reaches past them to stay easy to hit.
+        resize_on_border = true,
+        extend_border_grab_area = 10,
+        hover_icon_on_border = true,
         layout = "dwindle",
       },
       decoration = {
@@ -166,8 +214,15 @@ in {
         force_default_wallpaper = 0,
       },
       ecosystem = { no_update_news = true },
-      input = { kb_layout = ${builtins.toJSON input.layout}, follow_mouse = 1 },
+      input = { kb_layout = ${builtins.toJSON input.layout}, follow_mouse = 2 },
     })
+
+    -- Hyprland loads the listed plugins after each parse and unloads any no longer listed.
+    hl.plugin.load("${hyprbars}/lib/libhyprbars.so")
+    -- Apps that draw their own title bar.
+    if hl.plugin.hyprbars then
+      hl.window_rule({ name = "temple-own-titlebar", match = { class = ${builtins.toJSON "^(${lib.concatStringsSep "|" titlebarExclude})$"} }, ["hyprbars:no_bar"] = true })
+    end
 
     dofile(os.getenv("HOME") .. "/.local/state/temple/theme/hyprland.lua")
 
@@ -180,10 +235,24 @@ in {
 
     hl.layer_rule({ name = "temple-glass", match = { namespace = "^temple-" }, blur = true, ignore_alpha = 0.3 })
 
-    hl.on("hyprland.start", function()
-      hl.exec_cmd("qs -p /etc/temple/shell")
+    ${builtins.readFile ./windows.lua}
+
+    -- Binds cannot report a modifier coming up after a combo such as Alt+Tab,
+    -- so every Alt and Super release goes to the shell (key hint, Alt+Tab).
+    -- Keycodes are evdev + 8: 64 Alt_L, 133 Super_L, 134 Super_R.
+    local temple_modifiers = { [64] = "alt", [133] = "super", [134] = "super" }
+    hl.on("input.keyboard.key", function(keycode, _, state)
+      local modifier = temple_modifiers[keycode]
+      if modifier and state == 0 then
+        hl.dispatch(hl.dsp.global("temple:released-" .. modifier))
+      end
     end)
 
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: b: "hl.bind(${builtins.toJSON key}, ${b.action}, ${bindOptions b})") (binds // mouseBinds))}
+    hl.on("hyprland.start", function()
+      hl.exec_cmd("qs -p /etc/temple/shell")
+      ${lib.concatMapStringsSep "\n      " (command: "hl.exec_cmd(${builtins.toJSON command})") autostart}
+    end)
+
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: b: "hl.bind(${builtins.toJSON key}, ${b.action}, ${bindOptions b})") (binds // mouseBinds // hintBinds))}
   '';
 }

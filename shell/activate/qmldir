@@ -1,0 +1,3 @@
+singleton ActivateLinux 1.0 ActivateLinux.qml
+Watermark 1.0 Watermark.qml
+ActivateToggle 1.0 ActivateToggle.qml

@@ -9,19 +9,16 @@ import "notifications"
 import "keybinds"
 import "themes"
 import "theme"
+import "config"
+import "activate"
+import "switcher"
+import "start"
 
 ShellRoot {
     id: shell
 
-    property var barMonitors: ({})
-    readonly property var barScreens: barMonitors[Theme.style === "temple" ? "top" : "bottom"] ?? []
-
-    FileView {
-        path: Quickshell.env("TEMPLE_BAR") || "/etc/temple/bar.json"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: shell.barMonitors = JSON.parse(text()).monitors
-    }
+    readonly property var barScreens: Config.barMonitors[Theme.style === "temple" ? "top" : "bottom"] ?? []
+    readonly property var watermarkScreens: Config.activateLinuxMonitors
 
     Variants {
         model: Quickshell.screens
@@ -38,8 +35,23 @@ ShellRoot {
         Bar {
             required property ShellScreen modelData
             screen: modelData
-            onStartRequested: palette.toggle()
+            onStartRequested: startMenu.toggle(modelData)
         }
+    }
+
+    Variants {
+        model: Quickshell.screens.filter(screen => shell.watermarkScreens.length === 0 || shell.watermarkScreens.includes(screen.name))
+
+        Watermark {
+            required property ShellScreen modelData
+            screen: modelData
+        }
+    }
+
+    StartMenu {
+        id: startMenu
+        onLauncherRequested: palette.toggle()
+        onThemesRequested: themePicker.show()
     }
 
     Palette {
@@ -53,6 +65,11 @@ ShellRoot {
 
     Keybinds {
         id: keybinds
+    }
+
+    KeyHint {
+        id: keyHint
+        keybinds: keybinds.keybinds
     }
 
     Notifications {}
@@ -76,6 +93,55 @@ ShellRoot {
         name: "themes"
         description: "Toggle the theme picker"
         onPressed: themePicker.toggle()
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "hint-super"
+        description: "List Super binds while Super is held"
+        onPressed: keyHint.hold("Super")
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "released-super"
+        description: "Super came up"
+        onPressed: keyHint.release()
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "released-alt"
+        description: "Alt came up"
+        onPressed: {
+            keyHint.release();
+            switcher.commit();
+        }
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "hint-alt"
+        description: "List Alt binds while Alt is held"
+        onPressed: keyHint.hold("Alt")
+    }
+
+    Switcher {
+        id: switcher
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "switcher-next"
+        description: "Alt+Tab window switcher, next window"
+        onPressed: switcher.step(1)
+    }
+
+    GlobalShortcut {
+        appid: "temple"
+        name: "switcher-previous"
+        description: "Alt+Tab window switcher, previous window"
+        onPressed: switcher.step(-1)
     }
 
     IpcHandler {

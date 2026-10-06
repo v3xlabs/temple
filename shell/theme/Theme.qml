@@ -42,8 +42,8 @@ Singleton {
         return true;
     }
 
-    function select(next: string) {
-        const theme = themes[next];
+    function select(next: string, from = themes) {
+        const theme = from[next];
         barTokens = Object.assign({}, barTokens, {
             [theme.style]: theme.bar ?? {}
         });
@@ -71,9 +71,11 @@ Singleton {
         onFileChanged: reload()
         onLoaded: {
             const index = JSON.parse(text());
-            root.themes = root.qmlColors(index.themes);
+            const themes = root.qmlColors(index.themes);
             root.fallback = index.default;
-            root.select(root.name in root.themes ? root.name : root.fallback);
+            // Tokens first: a bar loads the moment `themes` names its style.
+            root.select(root.name in themes ? root.name : root.fallback, themes);
+            root.themes = themes;
         }
     }
 

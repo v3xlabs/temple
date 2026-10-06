@@ -1,15 +1,15 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Widgets
 import "../theme"
+import "../apps"
 
 PanelWindow {
     id: root
 
     property bool open: false
-    property var commands: []
 
     signal themesRequested
 
@@ -21,27 +21,32 @@ PanelWindow {
         }
     }
 
-    readonly property var entries: [...commands.map(c => ({
+    readonly property var entries: [...Apps.commands.map(c => ({
                     label: c.label,
                     detail: "Command",
-                    run: () => Quickshell.execDetached(c.exec)
+                    icon: c.icon,
+                    run: () => Apps.run(c)
                 })),
         {
             label: "Change theme",
             detail: Theme.label,
+            icon: "preferences-desktop-theme",
             run: () => root.themesRequested()
         },
         {
             label: "Reload shell",
             detail: "Command",
+            icon: "view-refresh",
             run: () => Quickshell.reload(true)
         },
-        ...DesktopEntries.applications.values.filter(app => !app.noDisplay).sort((a, b) => a.name.localeCompare(b.name)).map(app => ({
+        ...Apps.applications.map(app => ({
                     label: app.name,
                     detail: app.genericName,
+                    icon: app.icon,
                     search: [app.genericName, ...app.keywords].join(" ").toLowerCase(),
-                    run: () => app.execute()
+                    run: () => Apps.launch(app)
                 }))]
+
     readonly property string needle: query.text.toLowerCase()
     readonly property var matches: entries.filter(e => e.label.toLowerCase().includes(needle) || (e.search ?? "").includes(needle)).slice(0, 10)
     property int selected: 0
@@ -49,13 +54,6 @@ PanelWindow {
     function run(entry) {
         open = false;
         entry.run();
-    }
-
-    FileView {
-        path: Quickshell.env("TEMPLE_COMMANDS") || "/etc/temple/commands.json"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.commands = JSON.parse(text())
     }
 
     visible: open
@@ -109,7 +107,7 @@ PanelWindow {
                     leftPadding: 8
                     verticalAlignment: Text.AlignVCenter
                     visible: query.text === ""
-                    text: "Search commands"
+                    text: "Search apps and commands"
                     color: Theme.textMuted
                     font: query.font
                 }
@@ -131,13 +129,23 @@ PanelWindow {
                     required property int index
 
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 34
+                    Layout.preferredHeight: 38
                     radius: Math.max(Theme.radius - 6, 0)
                     color: row.index === root.selected ? Theme.selection : "transparent"
 
-                    Text {
+                    IconImage {
+                        id: icon
+
                         anchors.verticalCenter: parent.verticalCenter
                         x: 10
+                        implicitSize: 24
+                        source: Apps.iconSource(row.modelData.icon ?? "")
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: icon.right
+                        anchors.leftMargin: 10
                         text: row.modelData.label
                         color: Theme.text
                         font.family: Theme.fontSans

@@ -41,6 +41,9 @@ temple.themes.mine = import ./mine.nix; # added next to the built-in themes
 temple.terminal = pkgs.kitty; # opened by Super+Return, Alt+K and the launcher
 temple.backgrounds = [./left.png ./right.png]; # default: [shell/bg.png]
 temple.bar.monitors = { top = ["DP-5"]; bottom = ["DP-4"]; }; # the temple style draws at the top, xp and win7 at the bottom; [] means every screen
+temple.activateLinux = { enable = true; monitors = ["DP-4"]; }; # opt-in "Activate Linux" watermark, toggled from a bar icon
+temple.kwallet.enable = true; # default when Plasma 6 is enabled: Signal, Chromium and other apps share Plasma's KWallet 6
+temple.titlebars.exclude = ["chromium(-browser)?" "code" "discord"]; # window classes that draw their own title bar; Temple adds one to every other window
 temple.keybinds.terminal = {
   key = "Alt+K"; # Plasma notation: Meta, Ctrl, Alt, Shift, then a key
   command = "kitty";
@@ -56,23 +59,26 @@ A `temple.keybinds` entry with the same key as a default below replaces that def
 | Keys | Action |
 | --- | --- |
 | Super+K | Launcher: apps, commands, theme picker |
+| Start button | XP and Windows 7 themes: their own start menu with pinned and recent programs, All Programs, folders, and Log off / Shut down behind a confirmation dialog in that style. Other themes: the launcher |
 | Super+T | Theme picker |
 | Super+Return | Terminal (`temple.terminal`) |
 | Alt+K | Terminal (`temple.terminal`) |
 | Print / Shift+Print | Screenshot a region / every screen to `~/Pictures/Screenshots` and the clipboard |
 | Volume, mute, media and brightness keys | wpctl, playerctl, brightnessctl. These also work on the lock screen |
 | Super+L | Lock (`temple-lock`) |
-| Alt+Tab / Alt+Shift+Tab | Next / previous window |
+| Alt+Tab / Alt+Shift+Tab | Window switcher with live previews, most recently used first. Release Alt to switch, Escape to cancel. Minimized windows come back when picked |
+| Click | Focuses the window and brings it to the front |
 | Super+E | dolphin |
 | Super+/ | Show all keybinds |
+| Hold Super / Hold Alt | List the binds that start with that modifier |
 | Super+Q | Close window |
 | Super+F | Fullscreen |
-| Super+Up / Super+Down | Maximize / restore |
-| Super+V | Toggle floating |
-| Super+Drag / Super+Right-drag | Move / resize with the mouse |
-| Super+Left / Super+Right | Move window left / right, onto the next monitor at the edge |
-| Super+Shift+Left / Super+Shift+Right | Send window to the previous / next monitor |
-| Super+Shift+Up / Super+Shift+Down | Move window up / down |
+| Super+Up | Maximize |
+| Super+Down | Restore a maximized window, minimize a restored one |
+| Super+V | Toggle tiling (windows float by default) |
+| Super+Drag / Super+Right-drag | Move / resize with the mouse. Dropping on the top edge maximizes, on a side edge takes that half, in a corner a quarter. Dragging a snapped window away restores its size |
+| Super+Left / Super+Right | Move one half-screen that way: left half, right half, then the next screen's left half. Super+Down restores the size from before the snap |
+| Super+Shift+Arrows | Send window to the screen in that direction |
 | Super+Ctrl+Arrows | Focus |
 | Super+Shift+1..9 | Send window to workspace |
 | Super+1..9 | Workspace |

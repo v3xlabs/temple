@@ -4,7 +4,10 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
+import Quickshell.Hyprland
 import "../theme"
+import "../activate"
+import "../windows"
 
 PanelWindow {
     id: bar
@@ -20,15 +23,6 @@ PanelWindow {
     readonly property color buttonHover: bar.tokens.buttonHover
     readonly property color buttonActive: bar.tokens.buttonActive
     readonly property color textColor: bar.tokens.text
-
-    function onThisScreen(toplevel: Toplevel): bool {
-        const screens = toplevel.screens;
-        for (let i = 0; i < screens.length; i++) {
-            if (screens[i]?.name === bar.screen.name)
-                return true;
-        }
-        return false;
-    }
 
     WlrLayershell.namespace: "temple-bar"
 
@@ -173,16 +167,17 @@ PanelWindow {
             spacing: 2
 
             Repeater {
-                model: ToplevelManager.toplevels
+                model: ScriptModel {
+                    values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
+                }
 
                 Rectangle {
                     id: task
 
-                    required property Toplevel modelData
+                    required property HyprlandToplevel modelData
 
                     readonly property color fill: task.modelData.activated ? bar.buttonActive : bar.buttonHover
 
-                    visible: bar.onThisScreen(task.modelData)
                     width: 54
                     height: bar.height - 4
                     radius: 3
@@ -226,7 +221,8 @@ PanelWindow {
                     IconImage {
                         anchors.centerIn: parent
                         implicitSize: 26
-                        source: Quickshell.iconPath(DesktopEntries.heuristicLookup(task.modelData.appId)?.icon ?? "", "application-x-executable")
+                        source: Windows.icon(task.modelData)
+                        opacity: Windows.minimized(task.modelData) ? 0.5 : 1
                     }
 
                     Rectangle {
@@ -248,9 +244,9 @@ PanelWindow {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onClicked: mouse => {
                             if (mouse.button === Qt.MiddleButton)
-                                task.modelData.close();
+                                task.modelData.wayland?.close();
                             else
-                                task.modelData.activate();
+                                Windows.click(task.modelData);
                         }
                     }
                 }
@@ -260,6 +256,10 @@ PanelWindow {
         Row {
             Layout.alignment: Qt.AlignVCenter
             spacing: 6
+
+            ActivateToggle {
+                anchors.verticalCenter: parent.verticalCenter
+            }
 
             Repeater {
                 model: SystemTray.items

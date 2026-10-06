@@ -10,6 +10,9 @@
     hyprland = import ./hyprland.nix {
       inherit lib;
       inherit (cfg) monitors input keybinds;
+      autostart = lib.optional cfg.kwallet.enable "${config.security.pam.services.login.kwallet.package}/libexec/pam_kwallet_init";
+      hyprbars = pkgs.hyprlandPlugins.hyprbars;
+      titlebarExclude = cfg.titlebars.exclude;
       exe = {
         terminal = lib.getExe cfg.terminal;
         screenshot = lib.getExe screenshot;
@@ -29,9 +32,14 @@
 
     stateLink = "$HOME/.local/state/temple/theme";
 
+    # Electron, Chromium and Qt pick the KDE wallet and platform theme only when
+    # the desktop list names KDE. Hyprland stays first, so its portals win.
+    desktopNames = "Hyprland" + lib.optionalString cfg.kwallet.enable ":KDE";
+
     session = pkgs.writeShellScript "temple-session" ''
       export HYPRLAND_CONFIG=/etc/temple/hypr/hyprland.lua
       export KITTY_CONFIG_DIRECTORY=/etc/temple/kitty
+      ${lib.optionalString cfg.kwallet.enable "export KDE_SESSION_VERSION=6"}
       # The Hyprland config, kitty and hyprlock read the theme through this link,
       # so it must resolve before Hyprland starts. A removed theme leaves it dangling.
       if [ ! -e "${stateLink}/theme.json" ]; then
@@ -47,9 +55,9 @@
       [Desktop Entry]
       Name=Temple
       Comment=v3x temple desktop
-      Exec=${lib.getExe config.programs.uwsm.package} start -e -D Hyprland -N Temple -- ${session}
+      Exec=${lib.getExe config.programs.uwsm.package} start -e -D ${desktopNames} -N Temple -- ${session}
       Type=Application
-      DesktopNames=Hyprland
+      DesktopNames=${lib.replaceStrings [":"] [";"] desktopNames}
       DESKTOP
     '';
 
@@ -64,7 +72,7 @@
         fi
         mkdir -p "$HOME/.local/state/temple"
         ln -sfn "$dir" "${stateLink}"
-        ${hyprctl} eval "$(cat "$dir/hyprland.lua")" >/dev/null
+        ${hyprctl} reload >/dev/null
         # Kitty rereads its config on SIGUSR1. Wrappers rename the binary, so match argv0.
         pkill -USR1 -f '^([^ ]*/)?kitty( |$)' || true
       '';
@@ -191,6 +199,20 @@
             description = "Active window border. More than one colour draws a gradient.";
           };
           inactive = lib.mkOption {type = lib.types.nonEmptyListOf colour;};
+          titlebar = let
+            token = default:
+              lib.mkOption {
+                type = colour;
+                inherit default;
+              };
+          in {
+            color = token config.palette.base01;
+            text = token config.palette.base05;
+            button = token config.palette.base02;
+            buttonText = token config.palette.base05;
+            close = token config.palette.base08;
+            closeText = token config.palette.base00;
+          };
         };
         bar = lib.mkOption {
           type = lib.types.attrsOf (lib.types.oneOf [lib.types.str lib.types.number]);
@@ -299,6 +321,46 @@
         };
       };
 
+      titlebars.exclude = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [
+          "chromium(-browser)?"
+          "[Gg]oogle-chrome"
+          "brave-browser"
+          "firefox"
+          "code"
+          "code-url-handler"
+          "codium"
+          "VSCodium"
+          "discord"
+          "vesktop"
+          "obsidian"
+          "Mattermost"
+          "[Ss]potify"
+          "Slack"
+          "steam"
+          "org\\.gnome\\..*"
+        ];
+        description = "Window classes, as regular expressions, that draw their own title bar and get no Temple title bar.";
+      };
+
+      kwallet.enable = lib.mkOption {
+        type = lib.types.bool;
+        default = config.services.desktopManager.plasma6.enable;
+        defaultText = lib.literalExpression "config.services.desktopManager.plasma6.enable";
+        description = "Use KWallet 6 for secrets, so apps like Signal share their keys with a Plasma session. The login password unlocks the wallet.";
+      };
+
+      activateLinux = {
+        enable = lib.mkEnableOption "the \"Activate Linux\" watermark. A bar icon turns it on and off";
+        monitors = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          example = ["DP-4"];
+          description = "Outputs that show the watermark, by connector name. An empty list shows it on every output.";
+        };
+      };
+
       idle.timeout = lib.mkOption {
         type = lib.types.ints.positive;
         default = 300;
@@ -318,6 +380,8 @@
 
       temple.themes = lib.mapAttrs (_: lib.mkDefault) self.themes;
 
+      security.pam.services.login.kwallet.enable = lib.mkIf cfg.kwallet.enable true;
+
       assertions = [
         {
           assertion = cfg.themes ? ${cfg.theme};
@@ -334,22 +398,27 @@
           "temple/commands.json".text = builtins.toJSON [
             {
               label = "Terminal";
+              icon = "utilities-terminal";
               exec = [(lib.getExe cfg.terminal)];
             }
             {
               label = "Files";
+              icon = "system-file-manager";
               exec = ["dolphin"];
             }
             {
               label = "Editor";
+              icon = "accessories-text-editor";
               exec = ["kate"];
             }
             {
               label = "Screenshot a region";
+              icon = "applets-screenshooter";
               exec = [(lib.getExe screenshot) "region"];
             }
             {
               label = "Lock";
+              icon = "preferences-desktop-user-password";
               exec = [(lib.getExe lock)];
             }
           ];
@@ -359,21 +428,24 @@
           "temple/kitty/kitty.conf".text = kitty.config;
           "temple/shell".source = "${shellSource}/share/temple/shell";
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
-          "temple/bar.json".text = builtins.toJSON {inherit (cfg.bar) monitors;};
+          "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
         }
         // lib.concatMapAttrs themeFiles cfg.themes;
 
-      environment.systemPackages = with pkgs; [
-        applyTheme
-        lock
-        screenshot
-        quickshell
-        cfg.terminal
-        kdePackages.breeze
-        kdePackages.dolphin
-        kdePackages.kate
-        wl-clipboard
-      ];
+      environment.systemPackages = with pkgs;
+        [
+          applyTheme
+          lock
+          screenshot
+          quickshell
+          cfg.terminal
+          kdePackages.breeze
+          kdePackages.breeze-icons
+          kdePackages.dolphin
+          kdePackages.kate
+          wl-clipboard
+        ]
+        ++ lib.optional cfg.kwallet.enable kdePackages.kwallet;
 
       fonts.packages = with pkgs; [
         inter

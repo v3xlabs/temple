@@ -6,7 +6,10 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
+import Quickshell.Hyprland
 import "../theme"
+import "../activate"
+import "../windows"
 
 PanelWindow {
     id: bar
@@ -189,14 +192,15 @@ PanelWindow {
                         id: tasks
 
                         model: ScriptModel {
-                            values: ToplevelManager.toplevels.values.filter(toplevel => toplevel.screens.some(screen => screen.name === bar.screen.name))
+                            values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
                         }
 
                         Rectangle {
                             id: task
 
-                            required property Toplevel modelData
+                            required property HyprlandToplevel modelData
                             readonly property bool active: task.modelData.activated
+                            readonly property bool minimized: Windows.minimized(task.modelData)
 
                             width: Math.min(160, Math.floor((taskArea.width - (tasks.count - 1) * taskRow.spacing) / tasks.count))
                             height: bar.height - 6
@@ -234,7 +238,8 @@ PanelWindow {
 
                                 IconImage {
                                     implicitSize: 16
-                                    source: Quickshell.iconPath(DesktopEntries.heuristicLookup(task.modelData.appId)?.icon ?? "", "application-x-executable")
+                                    source: Windows.icon(task.modelData)
+                                    opacity: task.minimized ? 0.5 : 1
                                 }
 
                                 Text {
@@ -255,9 +260,9 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                                 onClicked: mouse => {
                                     if (mouse.button === Qt.MiddleButton) {
-                                        task.modelData.close();
+                                        task.modelData.wayland?.close();
                                     } else {
-                                        task.modelData.activate();
+                                        Windows.click(task.modelData);
                                     }
                                 }
                             }
@@ -305,6 +310,10 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     x: 12
                     spacing: 6
+
+                    ActivateToggle {
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
 
                     Repeater {
                         model: SystemTray.items

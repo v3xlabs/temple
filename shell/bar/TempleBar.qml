@@ -4,7 +4,10 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
+import Quickshell.Widgets
 import "../theme"
+import "../activate"
+import "../windows"
 
 PanelWindow {
     id: bar
@@ -114,6 +117,33 @@ PanelWindow {
 
             Row {
                 spacing: 8
+
+                // This bar has no task list, so minimized windows wait here.
+                Repeater {
+                    model: ScriptModel {
+                        values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name && Windows.minimized(toplevel))
+                    }
+
+                    IconImage {
+                        id: minimizedWindow
+
+                        required property HyprlandToplevel modelData
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitSize: 18
+                        source: Windows.icon(minimizedWindow.modelData)
+                        opacity: 0.7
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: Windows.click(minimizedWindow.modelData)
+                        }
+                    }
+                }
+                ActivateToggle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: 18
+                }
 
                 Repeater {
                     model: SystemTray.items
