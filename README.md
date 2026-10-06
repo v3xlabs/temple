@@ -40,6 +40,7 @@ temple.theme = "xp"; # first-login theme, picked from temple.themes
 temple.themes.mine = import ./mine.nix; # added next to the built-in themes
 temple.terminal = pkgs.kitty; # opened by Super+Return, Alt+K and the launcher
 temple.backgrounds = [./left.png ./right.png]; # default: [shell/bg.png]
+temple.bar.monitors = { top = ["DP-5"]; bottom = ["DP-4"]; }; # the temple style draws at the top, xp and win7 at the bottom; [] means every screen
 temple.keybinds.terminal = {
   key = "Alt+K"; # Plasma notation: Meta, Ctrl, Alt, Shift, then a key
   command = "kitty";

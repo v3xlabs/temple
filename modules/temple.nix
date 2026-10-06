@@ -284,6 +284,21 @@
         description = "Hyprland monitor rules in declaration order.";
       };
 
+      bar.monitors = {
+        top = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          example = ["DP-5"];
+          description = "Outputs that show a bar at the top edge (style `temple`), by connector name as `hyprctl monitors` prints it. An empty list shows it on every output.";
+        };
+        bottom = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          example = ["DP-4"];
+          description = "Outputs that show a bar at the bottom edge (styles `xp` and `win7`). An empty list shows it on every output.";
+        };
+      };
+
       idle.timeout = lib.mkOption {
         type = lib.types.ints.positive;
         default = 300;
@@ -344,6 +359,7 @@
           "temple/kitty/kitty.conf".text = kitty.config;
           "temple/shell".source = "${shellSource}/share/temple/shell";
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
+          "temple/bar.json".text = builtins.toJSON {inherit (cfg.bar) monitors;};
         }
         // lib.concatMapAttrs themeFiles cfg.themes;
 

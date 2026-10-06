@@ -8,8 +8,21 @@ import "background"
 import "notifications"
 import "keybinds"
 import "themes"
+import "theme"
 
 ShellRoot {
+    id: shell
+
+    property var barMonitors: ({})
+    readonly property var barScreens: barMonitors[Theme.style === "temple" ? "top" : "bottom"] ?? []
+
+    FileView {
+        path: Quickshell.env("TEMPLE_BAR") || "/etc/temple/bar.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: shell.barMonitors = JSON.parse(text()).monitors
+    }
+
     Variants {
         model: Quickshell.screens
 
@@ -20,7 +33,7 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens
+        model: Quickshell.screens.filter(screen => shell.barScreens.length === 0 || shell.barScreens.includes(screen.name))
 
         Bar {
             required property ShellScreen modelData
