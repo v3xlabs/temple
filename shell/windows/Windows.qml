@@ -11,8 +11,18 @@ Singleton {
 
     property list<QtObject> windows: []
     readonly property QtObject active: windows.find(window => window.activated) ?? null
-    // KWin keeps the keyboard focus to itself, so the active window's screen stands in for it.
-    readonly property ShellScreen focusedScreen: active?.screen ?? Quickshell.screens[0]
+    // KWin keeps the keyboard focus to itself, so the active window's screen
+    // stands in for it. An overlay that takes the keyboard leaves no window
+    // active; falling back to another screen then would move that overlay,
+    // which hands the focus back and moves it again, so the last screen stays.
+    readonly property ShellScreen activeScreen: active?.screen ?? null
+    property ShellScreen lastScreen: null
+    readonly property ShellScreen focusedScreen: activeScreen ?? lastScreen ?? Quickshell.screens[0]
+
+    onActiveScreenChanged: {
+        if (activeScreen !== null)
+            lastScreen = activeScreen;
+    }
 
     // Windows taskbar click: a minimized window comes back, the focused one
     // minimizes, any other window gets focus.

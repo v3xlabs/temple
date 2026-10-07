@@ -19,6 +19,7 @@
     enable = true;
     user = "temple";
   };
+  services.displayManager.defaultSession = "temple";
 
   virtualisation.vmVariant.virtualisation = {
     cores = 8;

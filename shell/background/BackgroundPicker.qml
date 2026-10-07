@@ -19,7 +19,10 @@ PanelWindow {
             show();
     }
 
+    // Taken once, like the theme picker: following the focused screen would
+    // move the picker each time it takes or returns the keyboard.
     function show() {
+        screen = Windows.focusedScreen;
         BackgroundState.rescan();
         open = true;
         carousel.open(BackgroundState.chosen || (BackgroundState.all[0] ?? ""));
@@ -31,7 +34,6 @@ PanelWindow {
     }
 
     visible: open
-    screen: Windows.focusedScreen
     WlrLayershell.namespace: "temple-backgrounds"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -51,10 +53,13 @@ PanelWindow {
         anchors.fill: parent
 
         entries: BackgroundState.all.map(path => {
-            const name = path.slice(path.lastIndexOf("/") + 1);
+            const slash = path.lastIndexOf("/");
+            const file = path.slice(slash + 1);
+            // A file directly in the store carries its hash in front of the name.
+            const name = path.slice(0, slash) === "/nix/store" ? file.slice(file.indexOf("-") + 1) : file;
             return {
                 key: path,
-                label: path.startsWith("/nix/store/") ? name.slice(name.indexOf("-") + 1) : name
+                label: name.replace(/\.[^.]+$/, "")
             };
         })
         hint: "←/→ preview  ·  type to filter  ·  Enter keeps  ·  Esc restores"

@@ -40,6 +40,7 @@
       '';
 
     templeosFont = pkgs.callPackage ./templeos-font.nix {};
+    wallpapers = pkgs.callPackage ./wallpapers.nix {};
 
     stateLink = "$HOME/.local/state/temple/theme";
 
@@ -58,48 +59,80 @@
       '';
     };
 
-    # KWin reads its decoration and Alt+Tab layout from kwinrc. Expects $name.
-    # The switcher shows live previews, so KWin need not fade every other
-    # window, the Temple bar and background included, while it is open.
-    writeKwinTheme = ''
-      kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
-      kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme "temple-$name"
-      kwriteconfig6 --file kwinrc --group TabBox --key LayoutName "temple-$name"
-      kwriteconfig6 --file kwinrc --group TabBox --key HighlightWindows false
+    # Plain Plasma never reads these. The Temple session puts the active
+    # theme's xdg directory and /etc/temple/xdg in front of XDG_CONFIG_DIRS,
+    # and /etc/temple/share in front of XDG_DATA_DIRS. `[$i]` locks a key, so
+    # the value a user set for plain Plasma in ~/.config cannot override it.
+    # Locking whole groups instead would make KConfig write the lock into
+    # ~/.config the next time KWin saves kwinrc. The switcher shows live
+    # previews, so KWin need not fade every other window, the Temple bar and
+    # background included, while it is open.
+    kwinrc = name: ''
+      [org.kde.kdecoration2]
+      library[$i]=org.kde.kwin.aurorae
+      theme[$i]=temple-${name}
+
+      [TabBox]
+      LayoutName[$i]=temple-${name}
+      HighlightWindows[$i]=false
     '';
 
-    # Runs before KWin starts, so its first frame already wears the theme.
+    # KPackage refuses package files that are symlinks out of the package
+    # directory, so the files are copied rather than linked.
+    sessionData = pkgs.runCommand "temple-session-data" {} ''
+      mkdir -p $out/share
+      cp -rL ${kwinThemes}/share/. ${shortcuts}/share/. $out/share/
+    '';
+
     # Kitty, the shell and the lock screen read the theme and wallpaper through
-    # these links. A removed theme leaves the link dangling.
-    init = pkgs.writeShellApplication {
-      name = "temple-init";
-      runtimeInputs = [pkgs.coreutils pkgs.kdePackages.kconfig];
+    # these links, and the session's config path runs through the theme link,
+    # so both must resolve before Plasma starts. A removed theme leaves the link
+    # dangling.
+    session = pkgs.writeShellScript "temple-session" ''
+      mkdir -p "$HOME/.local/state/temple"
+      if [ ! -e "${stateLink}/theme.json" ]; then
+        ln -sfn /etc/temple/themes/${cfg.theme} "${stateLink}"
+      fi
+      if [ ! -e "$HOME/.local/state/temple/background" ]; then
+        ln -sfn ${builtins.head cfg.backgrounds} "$HOME/.local/state/temple/background"
+      fi
+      export XDG_SESSION_DESKTOP=temple
+      export XDG_CONFIG_DIRS="${stateLink}/xdg:/etc/temple/xdg:''${XDG_CONFIG_DIRS:-/etc/xdg}"
+      export XDG_DATA_DIRS="/etc/temple/share:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+      export KITTY_CONFIG_DIRECTORY=/etc/temple/kitty
+      exec ${pkgs.kdePackages.plasma-workspace}/libexec/plasma-dbus-run-session-if-needed ${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland
+    '';
+
+    sessionPackage = pkgs.writeTextFile {
+      name = "temple-session-desktop";
+      destination = "/share/wayland-sessions/temple.desktop";
       text = ''
-        mkdir -p "$HOME/.local/state/temple"
-        if [ ! -e "${stateLink}/theme.json" ]; then
-          ln -sfn /etc/temple/themes/${cfg.theme} "${stateLink}"
-        fi
-        if [ ! -e "$HOME/.local/state/temple/background" ]; then
-          ln -sfn ${builtins.head cfg.backgrounds} "$HOME/.local/state/temple/background"
-        fi
-        name=$(basename "$(readlink "${stateLink}")")
-        ${writeKwinTheme}
+        [Desktop Entry]
+        Type=Application
+        Name=Temple
+        Comment=Plasma with the v3x temple shell
+        Exec=${session}
+        DesktopNames=KDE
       '';
+      passthru.providedSessions = ["temple"];
     };
+
+    # startplasma hands the session's environment to the user's systemd units.
+    inTemple = "${pkgs.bash}/bin/sh -c 'test \"$$XDG_SESSION_DESKTOP\" = temple'";
+    notInTemple = "${pkgs.bash}/bin/sh -c 'test \"$$XDG_SESSION_DESKTOP\" != temple'";
 
     applyTheme = pkgs.writeShellApplication {
       name = "temple-apply-theme";
-      runtimeInputs = [pkgs.coreutils pkgs.procps pkgs.systemd pkgs.kdePackages.kconfig];
+      runtimeInputs = [pkgs.coreutils pkgs.procps pkgs.systemd];
       text = ''
-        name=''${1:?usage: temple-apply-theme <theme>}
-        dir=/etc/temple/themes/$name
+        dir=/etc/temple/themes/''${1:?usage: temple-apply-theme <theme>}
         if [ ! -e "$dir/theme.json" ]; then
-          echo "temple-apply-theme: no theme $name in /etc/temple/themes" >&2
+          echo "temple-apply-theme: no theme $1 in /etc/temple/themes" >&2
           exit 1
         fi
         mkdir -p "$HOME/.local/state/temple"
         ln -sfn "$dir" "${stateLink}"
-        ${writeKwinTheme}
+        # KWin rereads kwinrc, now through the moved link.
         busctl --user call org.kde.KWin /KWin org.kde.KWin reconfigure
         # Kitty rereads its config on SIGUSR1. Wrappers rename the binary, so match argv0.
         pkill -USR1 -f '^([^ ]*/)?kitty( |$)' || true
@@ -308,10 +341,11 @@
     themeFiles = name: theme: {
       "temple/themes/${name}/theme.json".text = builtins.toJSON (theme // {inherit name;});
       "temple/themes/${name}/kitty.conf".text = kitty.theme theme;
+      "temple/themes/${name}/xdg/kwinrc".text = kwinrc name;
     };
   in {
     options.temple = {
-      enable = lib.mkEnableOption "the v3x temple desktop: Plasma 6 with the Temple shell in place of plasmashell";
+      enable = lib.mkEnableOption "the v3x temple desktop: a Temple session next to Plasma 6, with the Temple shell in place of plasmashell";
 
       themes = lib.mkOption {
         type = lib.types.attrsOf themeType;
@@ -389,6 +423,7 @@
 
     config = lib.mkIf cfg.enable {
       services.desktopManager.plasma6.enable = true;
+      services.displayManager.sessionPackages = [sessionPackage];
       hardware.graphics.enable = lib.mkDefault true;
 
       temple.themes = lib.mapAttrs (_: lib.mkDefault) self.themes;
@@ -451,10 +486,14 @@
           "temple/kitty/kitty.conf".text = kitty.config;
           "temple/shell".source = "${shellSource}/share/temple/shell";
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
+          "temple/wallpapers".source = wallpapers;
           "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
-          "xdg/kscreenlockerrc".text = ''
+          "temple/share".source = "${sessionData}/share";
+          # Locked, so the lock screen shows the Temple background even where
+          # plain Plasma was given another wallpaper.
+          "temple/xdg/kscreenlockerrc".text = ''
             [Greeter][Wallpaper][org.kde.image][General]
-            Image[$e]=file://$HOME/.local/state/temple/background
+            Image[$ie]=file://$HOME/.local/state/temple/background
           '';
         }
         // lib.concatMapAttrs themeFiles cfg.themes;
@@ -463,8 +502,6 @@
         applyTheme
         shell
         shellGrant
-        shortcuts
-        kwinThemes
         cfg.terminal
         kdePackages.aurorae
         kdePackages.dolphin
@@ -483,11 +520,20 @@
         templeosFont
       ];
 
+      # Both sessions start the same Plasma units. Only the Temple session
+      # swaps plasmashell for the Temple shell; the splash screen waits for
+      # plasmashell to draw the desktop, so it is skipped there too.
       systemd.user.services = {
-        # The Temple shell takes plasmashell's place in the Plasma session. The
-        # splash screen waits for plasmashell to draw the desktop, so it goes too.
-        plasma-plasmashell.enable = false;
-        plasma-ksplash.enable = false;
+        plasma-plasmashell = {
+          overrideStrategy = "asDropin";
+          enableDefaultPath = false;
+          serviceConfig.ExecCondition = notInTemple;
+        };
+        plasma-ksplash = {
+          overrideStrategy = "asDropin";
+          enableDefaultPath = false;
+          serviceConfig.ExecCondition = notInTemple;
+        };
         temple-shell = {
           description = "Temple shell";
           wantedBy = ["plasma-core.target"];
@@ -496,22 +542,15 @@
           # Apps started from the shell inherit the session's PATH.
           enableDefaultPath = false;
           serviceConfig = {
+            ExecCondition = inTemple;
             ExecStart = "${shell}/bin/qs -p /etc/temple/shell";
             Restart = "on-failure";
             Slice = "session.slice";
           };
         };
-        plasma-kwin_wayland = {
-          overrideStrategy = "asDropin";
-          enableDefaultPath = false;
-          serviceConfig.ExecStartPre = lib.getExe init;
-        };
       };
 
-      environment.sessionVariables = {
-        KITTY_CONFIG_DIRECTORY = "/etc/temple/kitty";
-        NIXOS_OZONE_WL = "1";
-      };
+      environment.sessionVariables.NIXOS_OZONE_WL = "1";
     };
   };
 

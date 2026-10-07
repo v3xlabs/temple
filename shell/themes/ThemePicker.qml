@@ -22,7 +22,11 @@ PanelWindow {
             show();
     }
 
+    // The screen is taken once: the picker takes the keyboard, which changes
+    // the focused screen, and a picker that followed it would move, hand the
+    // keyboard back, and move again.
     function show() {
+        screen = Windows.focusedScreen;
         original = Theme.name;
         open = true;
         carousel.open(Theme.name);
@@ -35,7 +39,6 @@ PanelWindow {
     }
 
     visible: open
-    screen: Windows.focusedScreen
     WlrLayershell.namespace: "temple-themes"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

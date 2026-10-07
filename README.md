@@ -1,20 +1,23 @@
 # v3x temple
 
-A desktop built on KDE Plasma 6 and Quickshell, packaged as a NixOS module. Plasma runs as it does on any NixOS machine, with KWin, KWallet, System Settings and the portals; the Temple shell takes the place of plasmashell.
+A desktop built on KDE Plasma 6 and Quickshell, packaged as a NixOS module. It adds a Temple session next to Plasma in the login screen. The Temple session is Plasma with KWin, KWallet, System Settings and the portals, and with the Temple shell in place of plasmashell. The Plasma session stays as it was.
 
 ## Layout
 
-- `modules/temple.nix` is the NixOS module. It enables Plasma 6, swaps plasmashell for the Temple shell, installs Temple's global shortcuts, and renders the kitty config plus one directory per theme under `/etc/temple`.
+- `modules/temple.nix` is the NixOS module. It enables Plasma 6, registers the `temple` session, and renders the kitty config, Temple's global shortcuts and KWin settings, and one directory per theme under `/etc/temple`.
 - `modules/kwin.nix` builds one KWin window decoration and one Alt+Tab switcher per theme from the QML in `modules/kwin/`.
+- `modules/wallpapers.nix` downloads the default wallpapers of Windows XP, Windows 7, macOS Sequoia and macOS Tahoe at build time into `/etc/temple/wallpapers`, for the background picker. Microsoft and Apple own these images, so the repository holds only their URLs and hashes.
 - `themes/` holds the built-in themes: `xp` (Windows XP), `xp-luna` (Windows XP Luna), `win7-black` (Windows 7 Black, the default), `win7-aero` (Windows 7 Aero), `macos-sequoia` (macOS Sequoia), `macos-tahoe` (macOS Tahoe) and `templeos` (TempleOS). The `themeType` submodule in `modules/temple.nix` defines their shape: a base16 palette, an optional terminal palette, glass, radius, font and window-border tokens, a `style` (`xp`, `win7`, `macos` or `templeos`) that picks the bar, start menu and session dialogs, a `skin`, that style's `bar` tokens, the bar `edge`, and the `tray` and `notifications` tokens that the shared flyouts, tooltips, notification popups and notification centre draw from. `frame`, `lineWidth` and `font.bitmap` cover the macOS glass and the TempleOS text mode. `xp-luna` and `win7-aero` import `xp` and `win7-black` and change only the skin and colours; both macOS themes take their flyout tokens from `macos-flyouts.nix`. A new theme starts from a copy or an import of a built-in one. Skin `drawn` paints the bar from the tokens; skin `msstyles` uses the bitmaps in `shell/bar/assets/`, taken from the original Windows visual styles. Skins `sequoia` and `tahoe` are macOS releases; both draw from the `bar` tokens that `shell/macos/Macos.qml` reads, so another release is one more skin with its own tokens. The macOS themes use SF Pro and SF Mono, which the module extracts from Apple's download images. `templeos` uses the 8x8 system font of TempleOS, which `modules/templeos-font.nix` builds from `Kernel/FontStd.HC` of the TempleOS source.
 - `shell/` is the Quickshell config. `theme/Theme.qml` reads every theme from `/etc/temple/themes.json` and `Background.qml` reads `/etc/temple/backgrounds.json`. Both hot-reload.
-- `hosts/vm.nix` is the test VM. It autologs the `temple` user into Plasma.
+- `hosts/vm.nix` is the test VM. It autologs the `temple` user into the Temple session.
 
 ## Themes
 
 Super+T opens the theme picker. Each highlighted theme is applied to the whole desktop at once: the shell, the KWin window decoration and Alt+Tab switcher, and kitty. Enter keeps the theme. Escape goes back to the theme that was active when the picker opened. `qs -p /etc/temple/shell ipc call theme set xp` does the same from a terminal.
 
-The active theme is the link `~/.local/state/temple/theme`, which points into `/etc/temple/themes/<name>`. `temple-init` creates it from `temple.theme` before KWin starts on the first login, and again if the linked theme is removed. `temple-apply-theme <name>` moves the link, points KWin's decoration and switcher at the theme's `temple-<name>` packages in `kwinrc`, has KWin reload its config, and sends SIGUSR1 to kitty so that kitty rereads its config.
+The active theme is the link `~/.local/state/temple/theme`, which points into `/etc/temple/themes/<name>`. The session creates it from `temple.theme` on the first login, and again if the linked theme is removed. `temple-apply-theme <name>` moves the link, has KWin reload its config, and sends SIGUSR1 to kitty so that kitty rereads its config.
+
+The Temple session puts `~/.local/state/temple/theme/xdg` and `/etc/temple/xdg` in front of `XDG_CONFIG_DIRS`, and `/etc/temple/share` in front of `XDG_DATA_DIRS`. KWin finds the theme's window decoration, Alt+Tab switcher and Temple's shortcuts there. The Temple settings are locked in those files, so they win over what plain Plasma keeps in `~/.config`, and Temple writes nothing to `~/.config`. Plain Plasma does not read these directories, so its decoration, switcher, shortcuts and lock screen stay as they were.
 
 A kitty that uses its own config can follow the theme with `include ~/.local/state/temple/theme/kitty.conf` as the last line of that config.
 
@@ -49,9 +52,11 @@ temple.keybinds.terminal = {
 };
 ```
 
-Logging in to Plasma starts Temple. The Plasma session starts the same services as without Temple, apart from plasmashell and the splash screen, so KWallet, the polkit agent, power management and the portals behave as they do in a plain Plasma session. Apps that use KWallet, such as Chromium and Signal, keep their stored secrets.
+Pick Temple in SDDM. The Temple session starts the same Plasma services as the Plasma session, apart from plasmashell and the splash screen. Both sessions share one KDE config and one KWallet, so apps such as Chromium and Signal keep their stored secrets in either session.
 
-Temple's shortcuts are a KDE global shortcut component named Temple. System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma defaults and are configured in System Settings.
+Temple's shortcuts are a KDE global shortcut component named Temple, present only in the Temple session. System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma settings.
+
+`temple.bar.monitors` names the screens that get a bar, by connector name as `kscreen-doctor -o` prints it. An empty list puts a bar on every screen.
 
 ## Keys
 
@@ -61,7 +66,7 @@ Temple's shortcuts are a KDE global shortcut component named Temple. System Sett
 | Super+K | Launcher: apps, commands, theme picker |
 | Start button | Start menu in the style of the theme: pinned and recent programs, All Programs, folders, and Log off / Shut down behind a confirmation dialog |
 | Super+T | Theme picker |
-| Super+B | Background picker |
+| Super+B | Background picker: `temple.backgrounds`, the images in `~/Pictures/Wallpapers`, and the default wallpapers of Windows XP, Windows 7, macOS Sequoia and macOS Tahoe |
 | Super+Return | Terminal (`temple.terminal`) |
 | Alt+K | Terminal (`temple.terminal`) |
 | Super+/ | Show Temple's keybinds |
