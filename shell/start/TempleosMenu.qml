@@ -1,11 +1,11 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../theme"
 import "../apps"
 import "../session"
+import "../windows"
 
 // The TempleOS pull-down menu (Adam/Menu.HC DrawMenu): yellow text on blue,
 // the entry under the mouse or the keyboard cursor drawn yellow with blue text.
@@ -112,12 +112,11 @@ PanelWindow {
         dialog.show(target, action);
     }
 
-    // The overlay covers one screen; a click on another screen or a window
-    // focused from elsewhere shows up as a focus change instead.
+    // The overlay covers one screen; a window focused from elsewhere closes it.
     Connections {
-        target: Hyprland
-        function onRawEvent(event) {
-            if (root.open && (event.name === "focusedmon" || (event.name === "activewindowv2" && event.data !== "")))
+        target: Windows
+        function onActiveChanged() {
+            if (root.open && Windows.active !== null)
                 root.close();
         }
     }

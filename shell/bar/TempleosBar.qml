@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
@@ -132,21 +131,21 @@ PanelWindow {
 
         Repeater {
             model: ScriptModel {
-                values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
+                values: Windows.windows.filter(window => window.screen?.name === bar.screen.name)
             }
 
             Entry {
                 id: task
 
-                required property HyprlandToplevel modelData
+                required property QtObject modelData
 
                 readonly property string title: task.modelData.title.length > 18 ? task.modelData.title.slice(0, 17) + "~" : task.modelData.title
 
-                text: " " + (Windows.minimized(task.modelData) ? "(" + task.title + ")" : task.title) + " "
+                text: " " + (task.modelData.minimized ? "(" + task.title + ")" : task.title) + " "
                 active: task.modelData.activated
                 middleClose: true
                 onClicked: Windows.click(task.modelData)
-                onMiddleClicked: task.modelData.wayland?.close()
+                onMiddleClicked: Windows.close(task.modelData)
             }
         }
     }

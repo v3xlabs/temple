@@ -1,9 +1,9 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../pickers"
+import "../windows"
 
 // Every highlighted wallpaper shows on all screens at once. Enter keeps it,
 // Escape returns to the chosen one.
@@ -31,7 +31,7 @@ PanelWindow {
     }
 
     visible: open
-    screen: Quickshell.screens.find(screen => screen.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
+    screen: Windows.focusedScreen
     WlrLayershell.namespace: "temple-backgrounds"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

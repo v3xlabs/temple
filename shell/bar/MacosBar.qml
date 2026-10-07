@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
-import Quickshell.Hyprland
+import "../windows"
 import "../activate"
 import "../tray"
 import "../notifications"
@@ -20,11 +20,13 @@ PanelWindow {
 
     signal startRequested
 
-    readonly property HyprlandToplevel focused: Hyprland.activeToplevel
-    readonly property string appId: bar.focused?.wayland?.appId ?? bar.focused?.lastIpcObject.class ?? ""
-    readonly property string appName: bar.appId === "" ? "" : DesktopEntries.heuristicLookup(bar.appId)?.name ?? bar.appId
+    readonly property string appId: Windows.active?.appId ?? ""
+    readonly property string appName: Windows.active === null ? "" : Windows.entry(Windows.active)?.name ?? bar.appId
 
     WlrLayershell.namespace: "temple-bar"
+    BackgroundEffect.blurRegion: Region {
+        item: bar.contentItem
+    }
 
     anchors {
         top: true

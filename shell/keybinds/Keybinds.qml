@@ -18,6 +18,10 @@ PanelWindow {
 
     visible: open
     WlrLayershell.namespace: "temple-keybinds"
+    BackgroundEffect.blurRegion: Region {
+        item: Theme.blur ? panel : null
+        radius: Theme.radius
+    }
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
@@ -54,6 +58,8 @@ PanelWindow {
     }
 
     Rectangle {
+        id: panel
+
         anchors.centerIn: parent
         width: Math.min(parent.width - 80, 3 * 380 + 2 * 12 + 40)
         height: Math.min(parent.height - 80, content.implicitHeight + 40)

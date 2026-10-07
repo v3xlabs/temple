@@ -73,6 +73,10 @@ PanelWindow {
 
     visible: open
     WlrLayershell.namespace: "temple-palette"
+    BackgroundEffect.blurRegion: Region {
+        item: Theme.blur ? panel : null
+        radius: Theme.radius
+    }
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
@@ -91,6 +95,8 @@ PanelWindow {
     }
 
     Rectangle {
+        id: panel
+
         anchors.horizontalCenter: parent.horizontalCenter
         y: parent.height / 4
         width: 560

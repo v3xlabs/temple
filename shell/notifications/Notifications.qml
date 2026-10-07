@@ -3,12 +3,12 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
 import "../macos"
+import "../windows"
 
 // Popups for new notifications, stacked at the bar's end of the screen in the theme's layout.
 // Hiding a popup leaves the notification alive so the bell can still act on it.
@@ -35,7 +35,7 @@ PanelWindow {
     }
 
     visible: root.popups.length > 0
-    screen: Quickshell.screens.find(screen => screen.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
+    screen: Windows.focusedScreen
     WlrLayershell.namespace: "temple-notifications"
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Normal

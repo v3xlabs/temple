@@ -4,7 +4,6 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
-import Quickshell.Hyprland
 import "../theme"
 import "../activate"
 import "../tray"
@@ -27,6 +26,9 @@ PanelWindow {
     readonly property color textColor: bar.tokens.text
 
     WlrLayershell.namespace: "temple-bar"
+    BackgroundEffect.blurRegion: Region {
+        item: Theme.blur ? bar.contentItem : null
+    }
 
     anchors {
         bottom: true
@@ -170,13 +172,13 @@ PanelWindow {
 
             Repeater {
                 model: ScriptModel {
-                    values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
+                    values: Windows.windows.filter(window => window.screen?.name === bar.screen.name)
                 }
 
                 Rectangle {
                     id: task
 
-                    required property HyprlandToplevel modelData
+                    required property QtObject modelData
 
                     readonly property color fill: task.modelData.activated ? bar.buttonActive : bar.buttonHover
 
@@ -224,7 +226,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         implicitSize: 26
                         source: Windows.icon(task.modelData)
-                        opacity: Windows.minimized(task.modelData) ? 0.5 : 1
+                        opacity: task.modelData.minimized ? 0.5 : 1
                     }
 
                     Rectangle {
@@ -246,7 +248,7 @@ PanelWindow {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onClicked: mouse => {
                             if (mouse.button === Qt.MiddleButton)
-                                task.modelData.wayland?.close();
+                                Windows.close(task.modelData);
                             else
                                 Windows.click(task.modelData);
                         }

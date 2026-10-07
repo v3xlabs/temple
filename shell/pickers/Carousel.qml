@@ -97,7 +97,6 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        // Below Hyprland's ignore_alpha 0.3 for temple-*, so the live preview behind stays sharp.
         color: "#47000000"
     }
 

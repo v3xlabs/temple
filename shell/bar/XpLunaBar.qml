@@ -6,7 +6,6 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
-import Quickshell.Hyprland
 import "../activate"
 import "../notifications"
 import "../tray"
@@ -80,13 +79,13 @@ PanelWindow {
                         id: tasks
 
                         model: ScriptModel {
-                            values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
+                            values: Windows.windows.filter(window => window.screen?.name === bar.screen.name)
                         }
 
                         BorderImage {
                             id: task
 
-                            required property HyprlandToplevel modelData
+                            required property QtObject modelData
 
                             width: Math.min(160, Math.floor((taskArea.width - (tasks.count - 1) * taskRow.spacing) / tasks.count))
                             height: parent.height
@@ -103,7 +102,7 @@ PanelWindow {
                                 y: 7
                                 implicitSize: 16
                                 source: Windows.icon(task.modelData)
-                                opacity: Windows.minimized(task.modelData) ? 0.5 : 1
+                                opacity: task.modelData.minimized ? 0.5 : 1
                             }
 
                             Text {
@@ -128,7 +127,7 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                                 onClicked: mouse => {
                                     if (mouse.button === Qt.MiddleButton) {
-                                        task.modelData.wayland?.close();
+                                        Windows.close(task.modelData);
                                     } else {
                                         Windows.click(task.modelData);
                                     }

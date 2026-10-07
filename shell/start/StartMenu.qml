@@ -1,6 +1,6 @@
 import Quickshell
-import Quickshell.Hyprland
 import "../theme"
+import "../windows"
 
 // The start button's menu and the session confirmations, drawn in the
 // style of the active theme.
@@ -19,7 +19,7 @@ Scope {
 
     // action: "shutdown", "reboot", "logout" or "suspend".
     function confirm(action: string) {
-        menu?.confirmOn(Quickshell.screens.find(screen => screen.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0], action);
+        menu?.confirmOn(Windows.focusedScreen, action);
     }
 
     LazyLoader {

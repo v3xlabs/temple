@@ -1,12 +1,12 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
 import "../apps"
 import "../session"
+import "../windows"
 
 PanelWindow {
     id: root
@@ -60,12 +60,11 @@ PanelWindow {
         powerMenuOpen = false;
     }
 
-    // The overlay covers one screen; a click on another screen or a window
-    // focused from elsewhere shows up as a focus change instead.
+    // The overlay covers one screen; a window focused from elsewhere closes it.
     Connections {
-        target: Hyprland
-        function onRawEvent(event) {
-            if (root.open && (event.name === "focusedmon" || (event.name === "activewindowv2" && event.data !== "")))
+        target: Windows
+        function onActiveChanged() {
+            if (root.open && Windows.active !== null)
                 root.close();
         }
     }
@@ -96,6 +95,10 @@ PanelWindow {
 
     visible: open
     WlrLayershell.namespace: "temple-startmenu"
+    BackgroundEffect.blurRegion: Region {
+        item: Theme.blur ? menu : null
+        radius: menu.radius
+    }
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Normal

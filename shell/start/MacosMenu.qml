@@ -1,12 +1,12 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../apps"
 import "../macos"
 import "../session"
+import "../windows"
 
 // The Apple menu. It drops from the Apple logo and holds the system items:
 // settings, recent apps and the session actions.
@@ -92,18 +92,26 @@ PanelWindow {
         confirmOn(screen, action);
     }
 
-    // The overlay covers one screen; a click on another screen or a window
-    // focused from elsewhere shows up as a focus change instead.
+    // The overlay covers one screen; a window focused from elsewhere closes it.
     Connections {
-        target: Hyprland
-        function onRawEvent(event) {
-            if (root.open && (event.name === "focusedmon" || (event.name === "activewindowv2" && event.data !== "")))
+        target: Windows
+        function onActiveChanged() {
+            if (root.open && Windows.active !== null)
                 root.close();
         }
     }
 
     visible: open
     WlrLayershell.namespace: "temple-startmenu"
+    BackgroundEffect.blurRegion: Region {
+        item: menu
+        radius: Macos.menuRadius
+
+        Region {
+            item: root.recentOpen ? recent : null
+            radius: Macos.menuRadius
+        }
+    }
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     // The overlay spans the menu bar too, so the menu is placed below it explicitly.

@@ -1,6 +1,5 @@
 //@ pragma UseQApplication
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import "bar"
 import "palette"
@@ -11,14 +10,18 @@ import "themes"
 import "theme"
 import "config"
 import "activate"
-import "switcher"
 import "start"
+import "windows"
 
 ShellRoot {
     id: shell
 
     readonly property var barScreens: Config.barMonitors[Theme.barEdge] ?? []
     readonly property var watermarkScreens: Config.activateLinuxMonitors
+
+    function hasBar(screen: ShellScreen): bool {
+        return barScreens.length === 0 || barScreens.includes(screen.name);
+    }
 
     Variants {
         model: Quickshell.screens
@@ -30,7 +33,7 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => shell.barScreens.length === 0 || shell.barScreens.includes(screen.name))
+        model: Quickshell.screens.filter(screen => shell.hasBar(screen))
 
         Bar {
             required property ShellScreen modelData
@@ -74,11 +77,6 @@ ShellRoot {
         id: keybinds
     }
 
-    KeyHint {
-        id: keyHint
-        keybinds: keybinds.keybinds
-    }
-
     // Popups read theme tokens from their first binding.
     LazyLoader {
         active: Theme.ready
@@ -86,83 +84,8 @@ ShellRoot {
         Notifications {}
     }
 
-    GlobalShortcut {
-        appid: "temple"
-        name: "palette"
-        description: "Toggle the command palette"
-        onPressed: palette.toggle()
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "keybinds"
-        description: "Toggle the keybind overview"
-        onPressed: keybinds.toggle()
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "themes"
-        description: "Toggle the theme picker"
-        onPressed: themePicker.toggle()
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "backgrounds"
-        description: "Toggle the background picker"
-        onPressed: backgroundPicker.toggle()
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "hint-super"
-        description: "List Super binds while Super is held"
-        onPressed: keyHint.hold("Super")
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "released-super"
-        description: "Super came up"
-        onPressed: keyHint.release()
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "released-alt"
-        description: "Alt came up"
-        onPressed: {
-            keyHint.release();
-            switcher.commit();
-        }
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "hint-alt"
-        description: "List Alt binds while Alt is held"
-        onPressed: keyHint.hold("Alt")
-    }
-
-    Switcher {
-        id: switcher
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "switcher-next"
-        description: "Alt+Tab window switcher, next window"
-        onPressed: switcher.step(1)
-    }
-
-    GlobalShortcut {
-        appid: "temple"
-        name: "switcher-previous"
-        description: "Alt+Tab window switcher, previous window"
-        onPressed: switcher.step(-1)
-    }
-
+    // KDE global shortcuts reach the shell through these; see the kglobalaccel
+    // component the NixOS module installs.
     IpcHandler {
         target: "shell"
 
@@ -174,6 +97,16 @@ ShellRoot {
         }
         function toggleThemes(): void {
             themePicker.toggle();
+        }
+        function toggleBackgrounds(): void {
+            backgroundPicker.toggle();
+        }
+        function toggleKeybinds(): void {
+            keybinds.toggle();
+        }
+        function toggleStart(): void {
+            const focused = Windows.focusedScreen;
+            startMenu.toggle(shell.hasBar(focused) ? focused : Quickshell.screens.find(screen => shell.hasBar(screen)));
         }
     }
 }

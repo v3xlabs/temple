@@ -1,62 +1,79 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
+import org.kde.taskmanager as TaskManager
 
-// Taskbar actions. Minimizing lives in the Hyprland config (temple.minimize).
+// The windows on the current virtual desktop, from the task model Plasma's own
+// taskbar uses. KWin shares it only with binaries a desktop file grants
+// org_kde_plasma_window_management, which the NixOS module installs.
 Singleton {
     id: root
 
-    // Window addresses, most recently focused first.
-    property var recent: []
-
-    function minimized(toplevel: HyprlandToplevel): bool {
-        return toplevel.workspace?.name === "special:minimized";
-    }
+    property list<QtObject> windows: []
+    readonly property QtObject active: windows.find(window => window.activated) ?? null
+    // KWin keeps the keyboard focus to itself, so the active window's screen stands in for it.
+    readonly property ShellScreen focusedScreen: active?.screen ?? Quickshell.screens[0]
 
     // Windows taskbar click: a minimized window comes back, the focused one
     // minimizes, any other window gets focus.
-    function click(toplevel: HyprlandToplevel) {
-        if (toplevel.activated && !minimized(toplevel))
-            Quickshell.execDetached(["hyprctl", "eval", `temple.minimize("${toplevel.address}")`]);
+    function click(window: QtObject) {
+        if (window.activated && !window.minimized)
+            tasks.requestToggleMinimized(tasks.makeModelIndex(window.row));
         else
-            focus(toplevel);
+            focus(window);
     }
 
-    function focus(toplevel: HyprlandToplevel) {
-        const call = minimized(toplevel) ? `temple.restore("${toplevel.address}")` : `temple.focus("${toplevel.address}")`;
-        Quickshell.execDetached(["hyprctl", "eval", call]);
+    // Activating a minimized window restores it.
+    function focus(window: QtObject) {
+        tasks.requestActivate(tasks.makeModelIndex(window.row));
     }
 
-    // Hyprland also tracks windows that are not on screen, such as hidden
-    // helper windows. Only mapped windows get a toplevel handle, so the handle
-    // marks the windows a user can see; the IPC fields catch the rest.
-    function real(toplevel: HyprlandToplevel): bool {
-        const ipc = toplevel.lastIpcObject;
-        return toplevel.wayland !== null && ipc.mapped !== false && ipc.hidden !== true && toplevel.title !== "";
+    function close(window: QtObject) {
+        tasks.requestClose(tasks.makeModelIndex(window.row));
     }
 
-    readonly property var windows: Hyprland.toplevels.values.filter(real)
-
-    function byRecentUse() {
-        const rank = address => {
-            const index = recent.indexOf(address);
-            return index < 0 ? recent.length : index;
-        };
-        return windows.slice().sort((a, b) => rank(a.address) - rank(b.address));
+    function entry(window: QtObject): DesktopEntry {
+        return DesktopEntries.byId(window.desktopId) ?? DesktopEntries.heuristicLookup(window.appId);
     }
 
-    Connections {
-        target: Hyprland
-        function onActiveToplevelChanged() {
-            const address = Hyprland.activeToplevel?.address;
-            if (address)
-                root.recent = [address, ...root.recent.filter(other => other !== address)];
+    function icon(window: QtObject): string {
+        return Quickshell.iconPath(entry(window)?.icon ?? "", "application-x-executable");
+    }
+
+    TaskManager.TasksModel {
+        id: tasks
+
+        groupMode: TaskManager.TasksModel.GroupDisabled
+        sortMode: TaskManager.TasksModel.SortDisabled
+        filterByVirtualDesktop: true
+        filterByActivity: true
+    }
+
+    Instantiator {
+        model: tasks
+
+        delegate: QtObject {
+            required property var model
+            required property int index
+
+            readonly property int row: index
+            readonly property string title: model.display ?? ""
+            readonly property string appId: model.AppId ?? ""
+            // applications:org.kde.konsole.desktop for windows KDE matched to a desktop file.
+            readonly property string desktopId: String(model.LauncherUrlWithoutIcon ?? "").replace(/^applications:/, "").replace(/\.desktop$/, "")
+            readonly property bool activated: model.IsActive
+            readonly property bool minimized: model.IsMinimized
+            readonly property ShellScreen screen: {
+                const geometry = model.ScreenGeometry;
+                return Quickshell.screens.find(screen => screen.x === geometry.x && screen.y === geometry.y) ?? null;
+            }
         }
-    }
 
-    function icon(toplevel: HyprlandToplevel): string {
-        const appId = toplevel.wayland?.appId ?? toplevel.lastIpcObject.class ?? "";
-        return Quickshell.iconPath(DesktopEntries.heuristicLookup(appId)?.icon ?? "", "application-x-executable");
+        onObjectAdded: (index, object) => {
+            const windows = Array.from(root.windows);
+            windows.splice(index, 0, object);
+            root.windows = windows;
+        }
+        onObjectRemoved: (index, object) => root.windows = Array.from(root.windows).filter(window => window !== object)
     }
 }

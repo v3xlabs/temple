@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import "../frame"
 
 // A flyout attached to a tray icon. It opens away from the bar and right-aligns with the icon.
@@ -22,7 +21,7 @@ PopupWindow {
             visible = false;
             return;
         }
-        // A click on the tray icon first clears the focus grab and closes the flyout; it must not reopen it.
+        // A click on the tray icon first dismisses the flyout through the grab; it must not reopen it.
         if (Date.now() - closedAt < 250)
             return;
         const position = trigger.mapToItem(null, 0, 0);
@@ -41,16 +40,10 @@ PopupWindow {
     implicitWidth: panelWidth
     implicitHeight: body.implicitHeight + padding * 2 + gap
     color: "transparent"
+    grabFocus: true
     onVisibleChanged: {
         if (!visible)
             closedAt = Date.now();
-    }
-
-    // A grab requested before the popup maps never activates.
-    HyprlandFocusGrab {
-        windows: [popup]
-        active: popup.backingWindowVisible
-        onCleared: popup.visible = false
     }
 
     Item {

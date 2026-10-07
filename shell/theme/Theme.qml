@@ -40,6 +40,8 @@ Singleton {
     readonly property real surfaceOpacity: data.glass?.opacity ?? 0.72
     readonly property real panelOpacity: Math.min(surfaceOpacity + 0.15, 1)
     readonly property color border: data.glass?.border ?? "#1affffff"
+    // KWin blurs behind a surface only where the shell asks it to.
+    readonly property bool blur: (data.glass?.blur ?? 0) > 0
     readonly property color text: palette.base05 ?? "#d6d6e0"
     readonly property color textMuted: palette.base04 ?? "#8f8fa3"
     readonly property color selection: palette.base02 ?? "#26262f"
@@ -54,7 +56,7 @@ Singleton {
         return fontBitmap ? fontSize : fontSize + step;
     }
 
-    // Recolors the shell at once and syncs Hyprland, kitty and hyprlock shortly after.
+    // Recolors the shell at once and syncs KWin, Qt apps and kitty shortly after.
     function set(next: string): bool {
         if (!(next in themes))
             return false;
@@ -71,7 +73,7 @@ Singleton {
         name = next;
     }
 
-    // Themes write #RRGGBBAA like Hyprland. QML reads 8 digits as #AARRGGBB.
+    // Themes write #RRGGBBAA. QML reads 8 digits as #AARRGGBB.
     function qmlColors(value) {
         if (typeof value === "string" && /^#[0-9a-fA-F]{8}$/.test(value))
             return "#" + value.slice(7) + value.slice(1, 7);
@@ -119,7 +121,7 @@ Singleton {
 
     Timer {
         id: applyDelay
-        // Each apply reloads Hyprland; browsing quickly should only reload once.
+        // Each apply reconfigures KWin; browsing quickly should only apply once.
         interval: 250
         onTriggered: {
             if (apply.running)

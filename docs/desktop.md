@@ -1,12 +1,12 @@
 # Desktop Choices
 
-## Hyprland Quickshell
+## Plasma Quickshell
 
-Because hotreloading; fast iteration; everything custom by design.
+Because hotreloading; fast iteration; everything custom by design. KWin and the rest of Plasma stay as they are, so KWallet, System Settings, the portals and power management behave like any Plasma install; Quickshell replaces plasmashell only.
 
 ## Keyring (kwallet6)
 
-Kept for compat with KDE environments; signal-desktop depends on it.
+Plasma's own; signal-desktop and Chromium depend on it.
 
 ## Activate Linux
 

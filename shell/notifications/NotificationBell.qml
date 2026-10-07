@@ -4,7 +4,6 @@ import QtQuick.Effects
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Widgets
 import "../frame"
@@ -19,7 +18,7 @@ Item {
     readonly property var center: Theme.notifications.center
     readonly property color bellTint: root.center.bellTint
 
-    // A click on the bell first clears the focus grab; that same click must not reopen the panel.
+    // A click on the bell first dismisses the panel through the grab; that same click must not reopen it.
     property double dismissedAt: 0
 
     function toggle() {
@@ -121,21 +120,15 @@ Item {
         implicitHeight: frame.implicitHeight
         color: "transparent"
         visible: false
+        grabFocus: true
         onVisibleChanged: {
-            if (!panel.visible)
+            if (!panel.visible) {
+                root.dismissedAt = Date.now();
                 return;
+            }
             panel.now = Date.now();
             NotificationStore.markRead();
             content.forceActiveFocus();
-        }
-
-        HyprlandFocusGrab {
-            windows: [panel]
-            active: panel.backingWindowVisible
-            onCleared: {
-                root.dismissedAt = Date.now();
-                panel.visible = false;
-            }
         }
 
         Connections {

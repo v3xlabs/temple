@@ -6,22 +6,7 @@
     ...
   }: let
     cfg = config.temple;
-    hyprctl = "${config.programs.hyprland.package}/bin/hyprctl";
-    hyprland = import ./hyprland.nix {
-      inherit lib;
-      inherit (cfg) monitors input keybinds;
-      autostart = lib.optional cfg.kwallet.enable "${config.security.pam.services.login.kwallet.package}/libexec/pam_kwallet_init";
-      hyprbars = pkgs.hyprlandPlugins.hyprbars;
-      titlebarExclude = cfg.titlebars.exclude;
-      defaultTheme = cfg.theme;
-      exe = {
-        terminal = lib.getExe cfg.terminal;
-        screenshot = lib.getExe screenshot;
-        wpctl = lib.getExe' pkgs.wireplumber "wpctl";
-        playerctl = lib.getExe pkgs.playerctl;
-        brightnessctl = lib.getExe pkgs.brightnessctl;
-      };
-    };
+    kwinThemes = pkgs.callPackage ./kwin.nix {inherit (cfg) themes;};
     kitty = import ./kitty.nix;
     shellSource = self.packages.${pkgs.stdenv.hostPlatform.system}.shell;
 
@@ -73,133 +58,142 @@
       '';
     };
 
-    # Electron, Chromium and Qt pick the KDE wallet and platform theme only when
-    # the desktop list names KDE. Hyprland stays first, so its portals win.
-    desktopNames = "Hyprland" + lib.optionalString cfg.kwallet.enable ":KDE";
-
-    session = pkgs.writeShellScript "temple-session" ''
-      export HYPRLAND_CONFIG=/etc/temple/hypr/hyprland.lua
-      export KITTY_CONFIG_DIRECTORY=/etc/temple/kitty
-      ${lib.optionalString cfg.kwallet.enable "export KDE_SESSION_VERSION=6"}
-      # The Hyprland config, kitty and hyprlock read the theme through this link,
-      # so it must resolve before Hyprland starts. A removed theme leaves it dangling.
-      if [ ! -e "${stateLink}/theme.json" ]; then
-        mkdir -p "$HOME/.local/state/temple"
-        ln -sfn /etc/temple/themes/${cfg.theme} "${stateLink}"
-      fi
-      # The chosen wallpaper; hyprlock reads it, the background picker replaces it.
-      if [ ! -e "$HOME/.local/state/temple/background" ]; then
-        mkdir -p "$HOME/.local/state/temple"
-        ln -sfn ${builtins.head cfg.backgrounds} "$HOME/.local/state/temple/background"
-      fi
-      exec ${config.programs.hyprland.package}/bin/start-hyprland
+    # KWin reads its decoration and Alt+Tab layout from kwinrc. Expects $name.
+    # The switcher shows live previews, so KWin need not fade every other
+    # window, the Temple bar and background included, while it is open.
+    writeKwinTheme = ''
+      kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
+      kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme "temple-$name"
+      kwriteconfig6 --file kwinrc --group TabBox --key LayoutName "temple-$name"
+      kwriteconfig6 --file kwinrc --group TabBox --key HighlightWindows false
     '';
 
-    sessionPackage = pkgs.runCommand "temple-session-desktop" {passthru.providedSessions = ["temple"];} ''
-      mkdir -p $out/share/wayland-sessions
-      cat > $out/share/wayland-sessions/temple.desktop <<DESKTOP
-      [Desktop Entry]
-      Name=Temple
-      Comment=v3x temple desktop
-      Exec=${lib.getExe config.programs.uwsm.package} start -e -D ${desktopNames} -N Temple -- ${session}
-      Type=Application
-      DesktopNames=${lib.replaceStrings [":"] [";"] desktopNames}
-      DESKTOP
-    '';
+    # Runs before KWin starts, so its first frame already wears the theme.
+    # Kitty, the shell and the lock screen read the theme and wallpaper through
+    # these links. A removed theme leaves the link dangling.
+    init = pkgs.writeShellApplication {
+      name = "temple-init";
+      runtimeInputs = [pkgs.coreutils pkgs.kdePackages.kconfig];
+      text = ''
+        mkdir -p "$HOME/.local/state/temple"
+        if [ ! -e "${stateLink}/theme.json" ]; then
+          ln -sfn /etc/temple/themes/${cfg.theme} "${stateLink}"
+        fi
+        if [ ! -e "$HOME/.local/state/temple/background" ]; then
+          ln -sfn ${builtins.head cfg.backgrounds} "$HOME/.local/state/temple/background"
+        fi
+        name=$(basename "$(readlink "${stateLink}")")
+        ${writeKwinTheme}
+      '';
+    };
 
     applyTheme = pkgs.writeShellApplication {
       name = "temple-apply-theme";
-      runtimeInputs = [pkgs.coreutils pkgs.procps];
+      runtimeInputs = [pkgs.coreutils pkgs.procps pkgs.systemd pkgs.kdePackages.kconfig];
       text = ''
-        dir=/etc/temple/themes/''${1:?usage: temple-apply-theme <theme>}
+        name=''${1:?usage: temple-apply-theme <theme>}
+        dir=/etc/temple/themes/$name
         if [ ! -e "$dir/theme.json" ]; then
-          echo "temple-apply-theme: no theme $1 in /etc/temple/themes" >&2
+          echo "temple-apply-theme: no theme $name in /etc/temple/themes" >&2
           exit 1
         fi
         mkdir -p "$HOME/.local/state/temple"
         ln -sfn "$dir" "${stateLink}"
-        ${hyprctl} reload >/dev/null
+        ${writeKwinTheme}
+        busctl --user call org.kde.KWin /KWin org.kde.KWin reconfigure
         # Kitty rereads its config on SIGUSR1. Wrappers rename the binary, so match argv0.
         pkill -USR1 -f '^([^ ]*/)?kitty( |$)' || true
       '';
     };
 
-    # Hyprland runs in a uwsm user unit outside the logind session, so
-    # `loginctl lock-session` cannot resolve a session to lock from there.
-    lock = pkgs.writeShellApplication {
-      name = "temple-lock";
-      runtimeInputs = [pkgs.procps config.programs.hyprlock.package];
-      text = ''pidof hyprlock || hyprlock --config "${stateLink}/hyprlock.conf"'';
+    ipc = function: "${shell}/bin/qs -p /etc/temple/shell ipc call shell ${function}";
+    kwinShortcut = name: "${pkgs.systemd}/bin/busctl --user call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component invokeShortcut s ${lib.escapeShellArg name}";
+
+    defaultBinds = {
+      start = {
+        keys = ["Meta"];
+        command = ipc "toggleStart";
+        description = "Start menu";
+      };
+      palette = {
+        keys = ["Meta+K"];
+        command = ipc "togglePalette";
+        description = "Command palette";
+      };
+      keybinds = {
+        keys = ["Meta+/"];
+        command = ipc "toggleKeybinds";
+        description = "Show keybinds";
+      };
+      themes = {
+        keys = ["Meta+T"];
+        command = ipc "toggleThemes";
+        description = "Pick theme";
+      };
+      backgrounds = {
+        keys = ["Meta+B"];
+        command = ipc "toggleBackgrounds";
+        description = "Pick background";
+      };
+      terminal = {
+        keys = ["Meta+Return" "Alt+K"];
+        command = lib.getExe cfg.terminal;
+        description = "Terminal";
+      };
+      close = {
+        keys = ["Meta+Q"];
+        command = kwinShortcut "Window Close";
+        description = "Close window";
+      };
+      fullscreen = {
+        keys = ["Meta+F"];
+        command = kwinShortcut "Window Fullscreen";
+        description = "Fullscreen";
+      };
     };
 
-    screenshot = pkgs.writeShellApplication {
-      name = "temple-screenshot";
-      runtimeInputs = [pkgs.coreutils pkgs.grim pkgs.slurp pkgs.wl-clipboard pkgs.libnotify];
-      text = ''
-        dir="$HOME/Pictures/Screenshots"
-        mkdir -p "$dir"
-        file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
-        case "''${1:-region}" in
-          region)
-            geometry=$(slurp) || exit 0
-            grim -g "$geometry" "$file"
-            ;;
-          screen) grim "$file" ;;
-          *)
-            echo "usage: temple-screenshot [region|screen]" >&2
-            exit 1
-            ;;
-        esac
-        wl-copy --type image/png < "$file"
-        notify-send -a Screenshot -i "$file" "Screenshot copied" "$file"
-      '';
-    };
+    # A user bind takes its key away from the default that had it.
+    userKeys = map (bind: lib.toLower bind.key) (lib.attrValues cfg.keybinds);
+    duplicateKeys = lib.filter (key: lib.count (k: k == key) userKeys > 1) (lib.unique userKeys);
+    binds =
+      lib.filterAttrs (_: bind: bind.keys != []) (lib.mapAttrs (_: bind: bind // {keys = lib.filter (key: !(lib.elem (lib.toLower key) userKeys)) bind.keys;}) defaultBinds)
+      // lib.mapAttrs' (id: bind:
+        lib.nameValuePair "user-${id}" {
+          keys = [bind.key];
+          inherit (bind) command;
+          description = lib.defaultTo bind.command bind.description;
+        })
+      cfg.keybinds;
 
-    hypridleConfig = ''
-      general {
-        lock_cmd = "${lib.getExe lock}"
-        before_sleep_cmd = "${lib.getExe lock}"
-      }
+    # A kglobalaccel component: KWin's shortcut daemon finds it in
+    # share/kglobalaccel and runs an action's Exec when one of its keys is pressed.
+    shortcuts = pkgs.writeTextDir "share/kglobalaccel/temple.desktop" ''
+      [Desktop Entry]
+      Type=Application
+      Name=Temple
+      Exec=${ipc "toggleStart"}
+      X-KDE-GlobalShortcutType=Service
+      Actions=${lib.concatStringsSep ";" (lib.attrNames binds)}
+      ${lib.concatStrings (lib.mapAttrsToList (id: bind: ''
 
-      listener {
-        timeout = ${toString cfg.idle.timeout}
-        on-timeout = "${lib.getExe lock}"
-      }
+          [Desktop Action ${id}]
+          Name=${bind.description}
+          Exec=${pkgs.writeShellScript "temple-${id}" bind.command}
+          X-KDE-Shortcuts=${lib.concatStringsSep "," bind.keys}
+        '')
+        binds)}
     '';
 
-    hyprlockConfig = theme: ''
-      background {
-        monitor =
-        path = ~/.local/state/temple/background
-        blur_passes = 3
-      }
-
-      input-field {
-        monitor =
-        size = 280, 52
-        outline_thickness = 1
-        outer_color = rgb(${lib.removePrefix "#" theme.accent})
-        inner_color = rgb(${lib.removePrefix "#" theme.palette.base00})
-        font_color = rgb(${lib.removePrefix "#" theme.palette.base05})
-        font_family = ${theme.font.sans}
-        rounding = ${toString theme.radius}
-        fade_on_empty = false
-        placeholder_text = Password
-        position = 0, -20
-        halign = center
-        valign = center
-      }
-
-      label {
-        monitor =
-        text = cmd[update:1000] echo "$(date '+%H:%M')"
-        color = rgb(${lib.removePrefix "#" theme.palette.base05})
-        font_family = ${theme.font.sans}
-        font_size = 72
-        position = 0, 90
-        halign = center
-        valign = center
-      }
+    # KWin shares the window list and window previews only with binaries a
+    # desktop file names. The nixpkgs KWin resolves the `.quickshell-wrapped`
+    # binary back to the `quickshell` wrapper, so Exec names the wrapper.
+    shellGrant = pkgs.writeTextDir "share/applications/temple-shell.desktop" ''
+      [Desktop Entry]
+      Type=Application
+      Name=Temple shell
+      NoDisplay=true
+      Exec=${pkgs.quickshell}/bin/quickshell
+      X-KDE-Wayland-Interfaces=org_kde_plasma_window_management,zkde_screencast_unstable_v1
     '';
 
     colour = lib.types.strMatching "#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})";
@@ -313,13 +307,11 @@
 
     themeFiles = name: theme: {
       "temple/themes/${name}/theme.json".text = builtins.toJSON (theme // {inherit name;});
-      "temple/themes/${name}/hyprland.lua".text = hyprland.themeLua theme;
       "temple/themes/${name}/kitty.conf".text = kitty.theme theme;
-      "temple/themes/${name}/hyprlock.conf".text = hyprlockConfig theme;
     };
   in {
     options.temple = {
-      enable = lib.mkEnableOption "the v3x temple desktop session";
+      enable = lib.mkEnableOption "the v3x temple desktop: Plasma 6 with the Temple shell in place of plasmashell";
 
       themes = lib.mkOption {
         type = lib.types.attrsOf themeType;
@@ -341,13 +333,7 @@
       backgrounds = lib.mkOption {
         type = lib.types.nonEmptyListOf lib.types.path;
         default = [../shell/bg.png];
-        description = "Images displayed behind Temple windows. Screen N shows entry N modulo the list length. Hyprlock shows the first entry.";
-      };
-
-      input.layout = lib.mkOption {
-        type = lib.types.str;
-        default = "us";
-        description = "XKB layout passed to Hyprland.";
+        description = "Images displayed behind Temple windows. Screen N shows entry N modulo the list length. The lock screen shows the first entry until a background is picked.";
       };
 
       keybinds = lib.mkOption {
@@ -356,7 +342,7 @@
             key = lib.mkOption {
               type = lib.types.str;
               example = "Alt+Shift+R";
-              description = "Modifiers and one key joined by `+`, in the notation Plasma uses. Modifiers are Meta, Ctrl, Alt and Shift. The key is an XKB key name. Spaces in it become `_`, so Plasma's `Scroll Lock` binds `Scroll_Lock`.";
+              description = "Modifiers and one key joined by `+`, in the notation Plasma uses, such as `Meta+Shift+Return` or `Scroll Lock`. A modifier alone, such as `Meta`, fires when it is tapped.";
             };
             command = lib.mkOption {
               type = lib.types.str;
@@ -366,33 +352,13 @@
             description = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
-              description = "Label that `hyprctl binds` shows for this bind.";
+              description = "Label that the keybind overview and System Settings show for this bind.";
             };
           };
         });
         default = {};
-        example = lib.literalExpression ''{ terminal = { key = "Alt+K"; command = "kitty"; }; }'';
-        description = "User keybinds, added after the Temple defaults.";
-      };
-
-      monitors = lib.mkOption {
-        type = lib.types.listOf (lib.types.submodule {
-          options = {
-            output = lib.mkOption {type = lib.types.str;};
-            mode = lib.mkOption {type = lib.types.str;};
-            position = lib.mkOption {type = lib.types.str;};
-            scale = lib.mkOption {type = lib.types.oneOf [lib.types.int lib.types.str];};
-          };
-        });
-        default = [
-          {
-            output = "";
-            mode = "preferred";
-            position = "auto";
-            scale = 1;
-          }
-        ];
-        description = "Hyprland monitor rules in declaration order.";
+        example = lib.literalExpression ''{ notes = { key = "Meta+N"; command = "kate"; }; }'';
+        description = "User keybinds, added to the Temple defaults. Names may use letters, digits and `-`. A bind with the key of a default replaces that default. KWin's own shortcuts stay in System Settings.";
       };
 
       bar.monitors = {
@@ -400,7 +366,7 @@
           type = lib.types.listOf lib.types.str;
           default = [];
           example = ["DP-5"];
-          description = "Outputs that show a bar at the top edge, by connector name as `hyprctl monitors` prints it. An empty list shows it on every output. The XP and Windows 7 themes draw no top bar.";
+          description = "Outputs that show a bar at the top edge, by connector name as System Settings' Display page names it. An empty list shows it on every output. The XP and Windows 7 themes draw no top bar.";
         };
         bottom = lib.mkOption {
           type = lib.types.listOf lib.types.str;
@@ -408,36 +374,6 @@
           example = ["DP-4"];
           description = "Outputs that show a bar at the bottom edge, such as the XP and Windows 7 taskbars. An empty list shows it on every output.";
         };
-      };
-
-      titlebars.exclude = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [
-          "chromium(-browser)?"
-          "[Gg]oogle-chrome"
-          "brave-browser"
-          "firefox"
-          "code"
-          "code-url-handler"
-          "codium"
-          "VSCodium"
-          "discord"
-          "vesktop"
-          "obsidian"
-          "Mattermost"
-          "[Ss]potify"
-          "Slack"
-          "steam"
-          "org\\.gnome\\..*"
-        ];
-        description = "Window classes, as regular expressions, that draw their own title bar and get no Temple title bar.";
-      };
-
-      kwallet.enable = lib.mkOption {
-        type = lib.types.bool;
-        default = config.services.desktopManager.plasma6.enable;
-        defaultText = lib.literalExpression "config.services.desktopManager.plasma6.enable";
-        description = "Use KWallet 6 for secrets, so apps like Signal share their keys with a Plasma session. The login password unlocks the wallet.";
       };
 
       activateLinux = {
@@ -449,32 +385,26 @@
           description = "Outputs that show the watermark, by connector name. An empty list shows it on every output.";
         };
       };
-
-      idle.timeout = lib.mkOption {
-        type = lib.types.ints.positive;
-        default = 300;
-        description = "Seconds without activity before Temple locks the session.";
-      };
     };
 
     config = lib.mkIf cfg.enable {
-      programs.hyprland = {
-        enable = true;
-        withUWSM = true;
-      };
-      programs.hyprlock.enable = true;
-      services.hypridle.enable = true;
-
-      services.displayManager.sessionPackages = [sessionPackage];
+      services.desktopManager.plasma6.enable = true;
+      hardware.graphics.enable = lib.mkDefault true;
 
       temple.themes = lib.mapAttrs (_: lib.mkDefault) self.themes;
-
-      security.pam.services.login.kwallet.enable = lib.mkIf cfg.kwallet.enable true;
 
       assertions = [
         {
           assertion = cfg.themes ? ${cfg.theme};
           message = "temple.theme is \"${cfg.theme}\", expected one of ${lib.concatStringsSep ", " (lib.attrNames cfg.themes)}";
+        }
+        {
+          assertion = duplicateKeys == [];
+          message = "temple.keybinds: more than one bind uses ${lib.concatStringsSep ", " duplicateKeys}";
+        }
+        {
+          assertion = lib.all (id: builtins.match "[A-Za-z0-9-]+" id != null) (lib.attrNames cfg.keybinds);
+          message = "temple.keybinds: names may only use letters, digits and -";
         }
       ];
 
@@ -503,40 +433,46 @@
             {
               label = "Screenshot a region";
               icon = "applets-screenshooter";
-              exec = [(lib.getExe screenshot) "region"];
+              exec = ["spectacle" "--region"];
             }
             {
               label = "Lock";
               icon = "preferences-desktop-user-password";
-              exec = [(lib.getExe lock)];
+              exec = ["busctl" "--user" "call" "org.freedesktop.ScreenSaver" "/ScreenSaver" "org.freedesktop.ScreenSaver" "Lock"];
             }
           ];
-          "temple/hypr/hyprland.lua".text = hyprland.lua;
-          "temple/keybinds.json".text = builtins.toJSON hyprland.keybinds;
-          "temple/hypr/hypridle.conf".text = hypridleConfig;
+          "temple/keybinds.json".text = builtins.toJSON (lib.concatLists (lib.mapAttrsToList (_: bind:
+            map (key: {
+              inherit key;
+              inherit (bind) description;
+            })
+            bind.keys)
+          binds));
           "temple/kitty/kitty.conf".text = kitty.config;
           "temple/shell".source = "${shellSource}/share/temple/shell";
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
           "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
+          "xdg/kscreenlockerrc".text = ''
+            [Greeter][Wallpaper][org.kde.image][General]
+            Image[$e]=file://$HOME/.local/state/temple/background
+          '';
         }
         // lib.concatMapAttrs themeFiles cfg.themes;
 
-      environment.systemPackages = with pkgs;
-        [
-          applyTheme
-          lock
-          screenshot
-          shell
-          cfg.terminal
-          kdePackages.breeze
-          kdePackages.breeze-icons
-          kdePackages.dolphin
-          kdePackages.kate
-          wl-clipboard
-          pavucontrol
-          networkmanagerapplet
-        ]
-        ++ lib.optional cfg.kwallet.enable kdePackages.kwallet;
+      environment.systemPackages = with pkgs; [
+        applyTheme
+        shell
+        shellGrant
+        shortcuts
+        kwinThemes
+        cfg.terminal
+        kdePackages.aurorae
+        kdePackages.dolphin
+        kdePackages.kate
+        kdePackages.spectacle
+        pavucontrol
+        networkmanagerapplet
+      ];
 
       fonts.packages = with pkgs; [
         inter
@@ -548,23 +484,34 @@
       ];
 
       systemd.user.services = {
-        hypridle.serviceConfig.ExecStart = lib.mkForce [
-          ""
-          "${config.services.hypridle.package}/bin/hypridle --config /etc/temple/hypr/hypridle.conf"
-        ];
-
-        temple-polkit-agent = {
-          wantedBy = ["graphical-session.target"];
+        # The Temple shell takes plasmashell's place in the Plasma session. The
+        # splash screen waits for plasmashell to draw the desktop, so it goes too.
+        plasma-plasmashell.enable = false;
+        plasma-ksplash.enable = false;
+        temple-shell = {
+          description = "Temple shell";
+          wantedBy = ["plasma-core.target"];
           partOf = ["graphical-session.target"];
+          after = ["plasma-ksmserver.service" "plasma-kcminit.service"];
+          # Apps started from the shell inherit the session's PATH.
+          enableDefaultPath = false;
           serviceConfig = {
-            ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
+            ExecStart = "${shell}/bin/qs -p /etc/temple/shell";
             Restart = "on-failure";
-            RestartSec = 2;
+            Slice = "session.slice";
           };
+        };
+        plasma-kwin_wayland = {
+          overrideStrategy = "asDropin";
+          enableDefaultPath = false;
+          serviceConfig.ExecStartPre = lib.getExe init;
         };
       };
 
-      environment.sessionVariables.NIXOS_OZONE_WL = "1";
+      environment.sessionVariables = {
+        KITTY_CONFIG_DIRECTORY = "/etc/temple/kitty";
+        NIXOS_OZONE_WL = "1";
+      };
     };
   };
 

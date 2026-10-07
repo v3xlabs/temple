@@ -1,11 +1,11 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../theme"
 import "../background"
 import "../pickers"
+import "../windows"
 
 // Every highlighted theme is applied at once, so the whole desktop previews it.
 // Enter keeps it, Escape returns to the theme that was active on open.
@@ -35,7 +35,7 @@ PanelWindow {
     }
 
     visible: open
-    screen: Quickshell.screens.find(screen => screen.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
+    screen: Windows.focusedScreen
     WlrLayershell.namespace: "temple-themes"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 
 // The wallpaper every screen shows. The choice lives in two places: the
-// symlink hyprlock reads, and a text file QML can read back, since QML cannot
+// symlink the lock screen reads, and a text file QML can read back, since QML cannot
 // resolve a symlink target.
 Singleton {
     id: root

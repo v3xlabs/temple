@@ -19,9 +19,6 @@
     enable = true;
     user = "temple";
   };
-  services.displayManager.defaultSession = "temple";
-
-  environment.systemPackages = [pkgs.kdePackages.qtwayland];
 
   virtualisation.vmVariant.virtualisation = {
     cores = 8;

@@ -6,7 +6,6 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
-import Quickshell.Hyprland
 import "../theme"
 import "../activate"
 import "../tray"
@@ -194,15 +193,15 @@ PanelWindow {
                         id: tasks
 
                         model: ScriptModel {
-                            values: Windows.windows.filter(toplevel => toplevel.monitor?.name === bar.screen.name)
+                            values: Windows.windows.filter(window => window.screen?.name === bar.screen.name)
                         }
 
                         Rectangle {
                             id: task
 
-                            required property HyprlandToplevel modelData
+                            required property QtObject modelData
                             readonly property bool active: task.modelData.activated
-                            readonly property bool minimized: Windows.minimized(task.modelData)
+                            readonly property bool minimized: task.modelData.minimized
 
                             width: Math.min(160, Math.floor((taskArea.width - (tasks.count - 1) * taskRow.spacing) / tasks.count))
                             height: bar.height - 6
@@ -262,7 +261,7 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                                 onClicked: mouse => {
                                     if (mouse.button === Qt.MiddleButton) {
-                                        task.modelData.wayland?.close();
+                                        Windows.close(task.modelData);
                                     } else {
                                         Windows.click(task.modelData);
                                     }

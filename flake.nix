@@ -1,5 +1,5 @@
 {
-  description = "v3x temple: a Wayland desktop built on Hyprland and Quickshell";
+  description = "v3x temple: a KDE Plasma 6 desktop with a Quickshell shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

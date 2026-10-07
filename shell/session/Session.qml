@@ -3,28 +3,31 @@ import QtQuick
 import Quickshell
 
 // Ending or pausing the session. Callers confirm first; these act at once.
+// ksmserver ends the Plasma session cleanly before it powers off or reboots.
 Singleton {
     readonly property string user: Quickshell.env("USER") ?? ""
 
     function shutdown() {
-        Quickshell.execDetached(["systemctl", "poweroff"]);
+        ksmserver("logoutAndShutdown");
     }
 
     function reboot() {
-        Quickshell.execDetached(["systemctl", "reboot"]);
+        ksmserver("logoutAndReboot");
     }
 
     function suspend() {
         Quickshell.execDetached(["systemctl", "suspend"]);
     }
 
-    // uwsm stops the graphical session units before the compositor exits; if
-    // uwsm cannot, ending the logind session still returns to the login screen.
     function logout() {
-        Quickshell.execDetached(["sh", "-c", "uwsm stop || loginctl terminate-session \"$XDG_SESSION_ID\""]);
+        ksmserver("logout");
     }
 
     function lock() {
-        Quickshell.execDetached(["temple-lock"]);
+        Quickshell.execDetached(["busctl", "--user", "call", "org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver", "Lock"]);
+    }
+
+    function ksmserver(method: string) {
+        Quickshell.execDetached(["busctl", "--user", "call", "org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown", method]);
     }
 }
