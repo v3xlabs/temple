@@ -62,7 +62,7 @@ PanelWindow {
                 label: name.replace(/\.[^.]+$/, "")
             };
         })
-        hint: "←/→ preview  ·  type to filter  ·  Enter keeps  ·  Esc restores"
+        hint: "←/→ or scroll to preview  ·  type to filter  ·  Enter keeps  ·  Esc restores"
         delegate: preview
         onHighlighted: key => BackgroundState.previewPath(key)
         onAccepted: key => {

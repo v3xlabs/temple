@@ -60,7 +60,7 @@ PanelWindow {
                     key: name,
                     label: Theme.themes[name].label
                 }))
-        hint: "←/→ preview  ·  type to filter  ·  Enter keeps  ·  Esc restores " + (Theme.themes[root.original]?.label ?? "")
+        hint: "←/→ or scroll to preview  ·  type to filter  ·  Enter keeps  ·  Esc restores " + (Theme.themes[root.original]?.label ?? "")
         delegate: mock
         onHighlighted: key => Theme.set(key)
         onAccepted: root.open = false

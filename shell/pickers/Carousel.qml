@@ -107,6 +107,23 @@ Item {
         onClicked: root.cancelled()
     }
 
+    // One entry per wheel notch (120 units); touchpads send many small deltas
+    // that add up to a notch. Down and right move forward.
+    WheelHandler {
+        property real pending: 0
+
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: event => {
+            const delta = Math.abs(event.angleDelta.y) >= Math.abs(event.angleDelta.x) ? event.angleDelta.y : event.angleDelta.x;
+            pending -= delta;
+            const steps = Math.trunc(pending / 120);
+            if (steps === 0)
+                return;
+            pending -= steps * 120;
+            root.move(steps);
+        }
+    }
+
     Item {
         id: keyHandler
 
