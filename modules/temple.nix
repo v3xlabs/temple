@@ -41,6 +41,7 @@
 
     templeosFont = pkgs.callPackage ./templeos-font.nix {};
     wallpapers = pkgs.callPackage ./wallpapers.nix {};
+    clippy = pkgs.callPackage ./clippy.nix {};
 
     stateLink = "$HOME/.local/state/temple/theme";
 
@@ -487,6 +488,7 @@
           "temple/shell".source = "${shellSource}/share/temple/shell";
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
           "temple/wallpapers".source = wallpapers;
+          "temple/clippy".source = clippy;
           "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
           "temple/share".source = "${sessionData}/share";
           # Locked, so the lock screen shows the Temple background even where

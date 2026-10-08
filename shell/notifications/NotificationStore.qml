@@ -14,8 +14,11 @@ Singleton {
     property var history: []
     property int unread: 0
     property bool doNotDisturb: false
+    // Set while Clippy is loaded; he then shows Voxtype's notifications in his balloon.
+    property bool assistant: false
 
     signal popupRequested(Notification notification)
+    signal assistantRequested(Notification notification)
 
     function live(id: int): var {
         return id > 0 ? server.trackedNotifications.values.find(notification => notification.id === id) ?? null : null;
@@ -136,10 +139,13 @@ Singleton {
             if (notification.lastGeneration)
                 return;
             root.record(notification);
-            if (!root.doNotDisturb)
+            if (root.doNotDisturb) {
+                if (notification.transient)
+                    notification.expire();
+            } else if (root.assistant && notification.appName === "Voxtype")
+                root.assistantRequested(notification);
+            else
                 root.popupRequested(notification);
-            else if (notification.transient)
-                notification.expire();
         }
     }
 }

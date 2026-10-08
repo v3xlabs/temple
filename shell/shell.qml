@@ -12,6 +12,7 @@ import "config"
 import "activate"
 import "start"
 import "windows"
+import "clippy"
 
 ShellRoot {
     id: shell
@@ -82,6 +83,12 @@ ShellRoot {
         active: Theme.ready
 
         Notifications {}
+    }
+
+    LazyLoader {
+        active: Theme.ready && Theme.style === "xp"
+
+        Clippy {}
     }
 
     // KDE global shortcuts reach the shell through these; see the kglobalaccel
