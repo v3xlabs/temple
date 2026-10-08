@@ -17,6 +17,7 @@
         ./nix/treefmt.nix
         ./nix/devshell.nix
         ./nix/packages.nix
+        ./nix/checks.nix
         ./themes
         ./modules
         ./hosts

@@ -13,6 +13,7 @@ import "activate"
 import "start"
 import "windows"
 import "clippy"
+import "osd"
 
 ShellRoot {
     id: shell
@@ -83,6 +84,12 @@ ShellRoot {
         active: Theme.ready
 
         Notifications {}
+    }
+
+    LazyLoader {
+        active: Theme.ready
+
+        Osd {}
     }
 
     LazyLoader {

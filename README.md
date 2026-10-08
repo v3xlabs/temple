@@ -5,11 +5,15 @@ A desktop built on KDE Plasma 6 and Quickshell, packaged as a NixOS module. It a
 ## Layout
 
 - `modules/temple.nix` is the NixOS module. It enables Plasma 6, registers the `temple` session, and renders the kitty config, Temple's global shortcuts and KWin settings, and one directory per theme under `/etc/temple`.
-- `modules/kwin.nix` builds one KWin window decoration and one Alt+Tab switcher per theme from the QML in `modules/kwin/`. The XP themes use `modules/kwin/decoration-xp`, which assembles the Luna Blue frame and caption buttons from the bitmaps in XP's `luna.msstyles`; the build downloads that file and cuts the bitmaps out of it.
+- `modules/luna.nix` downloads XP's `luna.msstyles` at build time and cuts the Luna Blue bitmaps out of it, with transparency from the style's colour key or alpha. `frame/` holds the window frame and caption buttons; `startpanel/` holds the Start menu parts, exposed as `/etc/temple/luna/startpanel`. Microsoft owns these bitmaps, so the repository holds only the URL and hash.
+- `modules/kwin.nix` builds one KWin window decoration and one Alt+Tab switcher per theme from the QML in `modules/kwin/`. The XP themes use `modules/kwin/decoration-xp`, which assembles the Luna Blue frame and caption buttons from `luna.nix`'s `frame/` bitmaps.
+- `shell/start/XpStartMenu.qml` assembles the XP Start menu from the `startpanel/` bitmaps: the user pane, the program and places lists with their separators, the All Programs button and arrow, the log-off pane and its buttons, and the All Programs flyout. It uses the default pane sizes, sizing margins and content margins of `StartPanel.*` and `StartMenu::Toolbar.*` in the style's `NORMALBLUE_INI`. The arrow keys move the selection; Right on All Programs opens the flyout.
 - `modules/wallpapers.nix` downloads the default wallpapers of Windows XP, Windows 7, macOS Sequoia and macOS Tahoe at build time into `/etc/temple/wallpapers`, for the background picker. Microsoft and Apple own these images, so the repository holds only their URLs and hashes.
 - `modules/clippy.nix` downloads Clippy's sprite sheet and animation table from clippy.js into `/etc/temple/clippy`. Under the XP themes, `shell/clippy/Clippy.qml` shows him while [Voxtype](https://github.com/peteonrails/voxtype) works: he listens while it records (and taps his finger once `voxtype-audio-bridge` reports silence), works while it transcribes, and shows Voxtype's notifications in his balloon instead of the normal popup. He reads Voxtype's state from `$XDG_RUNTIME_DIR/voxtype/state`, so Voxtype's `state_file` must stay `"auto"`.
 - `themes/` holds the built-in themes: `xp` (Windows XP), `xp-luna` (Windows XP Luna), `win7-black` (Windows 7 Black, the default), `win7-aero` (Windows 7 Aero), `macos-sequoia` (macOS Sequoia), `macos-tahoe` (macOS Tahoe) and `templeos` (TempleOS). The `themeType` submodule in `modules/temple.nix` defines their shape: a base16 palette, an optional terminal palette, glass, radius, font and window-border tokens, a `style` (`xp`, `win7`, `macos` or `templeos`) that picks the bar, start menu and session dialogs, a `skin`, that style's `bar` tokens, the bar `edge`, and the `tray` and `notifications` tokens that the shared flyouts, tooltips, notification popups and notification centre draw from. `frame`, `lineWidth` and `font.bitmap` cover the macOS glass and the TempleOS text mode. `xp-luna` and `win7-aero` import `xp` and `win7-black` and change only the skin and colours; both macOS themes take their flyout tokens from `macos-flyouts.nix`. A new theme starts from a copy or an import of a built-in one. Skin `drawn` paints the bar from the tokens; skin `msstyles` uses the bitmaps in `shell/bar/assets/`, taken from the original Windows visual styles. Skins `sequoia` and `tahoe` are macOS releases; both draw from the `bar` tokens that `shell/macos/Macos.qml` reads, so another release is one more skin with its own tokens. The macOS themes use SF Pro and SF Mono, which the module extracts from Apple's download images. `templeos` uses the 8x8 system font of TempleOS, which `modules/templeos-font.nix` builds from `Kernel/FontStd.HC` of the TempleOS source.
 - `shell/` is the Quickshell config. `theme/Theme.qml` reads every theme from `/etc/temple/themes.json` and `Background.qml` reads `/etc/temple/backgrounds.json`. Both hot-reload.
+- `shell/osd/Osd.qml` replaces plasmashell's volume and brightness pop-up. It shows when the volume or mute state of the default PipeWire output changes, and when powerdevil reports a change from the brightness keys (its `org.kde.ScreenBrightness` `BrightnessChanged` signal, read through `busctl --user monitor`). It hides 1.5 s after the last change.
+- `shell/notifications/Notifications.qml` shows the notification popups. The XP themes draw a balloon. Its tail points at the tray icon of the app that sent the notification (when the status notifier id or title is the same as the notification's app name or desktop entry, ignoring case and separators), else at the clock. The XP bars publish their tray icons through `shell/tray/TrayIcons.qml`.
 - `hosts/vm.nix` is the test VM. It autologs the `temple` user into the Temple session.
 
 ## Themes
@@ -32,6 +36,23 @@ just fmt     # alejandra + qmlformat
 ```
 
 The VM mounts the host Nix store over virtiofs, so a rebuild only builds the changed store paths and no disk image. Shell edits still need a rebuild and a VM restart. Inside the VM, `systemctl --user restart temple-shell` restarts the shell and `journalctl --user -u temple-shell` prints its errors. `just shell` runs this checkout's shell against the VM's generated config. Stop the running shell first with `systemctl --user stop temple-shell`. KWin hands the window list only to the system's `quickshell`, so run `just shell` with the same nixpkgs as the system.
+
+## Tests
+
+`nix flake check` (or `just check`) runs the VM tests in `tests/`. `nix/checks.nix` registers them, and `tests/common.nix` holds the shared VM node and the Python helpers. Each test boots the VM host in QEMU, so the machine needs KVM. To run one test:
+
+```
+nix build -L --no-link 'path:.#checks.x86_64-linux.<name>'
+```
+
+| Test | What it asserts |
+| --- | --- |
+| `sessions` | Plain Plasma runs plasmashell with the user's decoration and has no Temple shell or shortcuts. The Temple session runs the Temple shell and no plasmashell or splash, registers its shortcuts, and uses the theme's KWin decoration. A theme switch moves the decoration and switcher, windows keep a decoration, and `~/.config/kwinrc` gets no Temple settings. This test boots two VMs. |
+| `picker-screens` | On three screens, Super+T and the launcher open one theme picker, on the screen of the active window. Arrows preview themes and Escape restores the first one. |
+| `pickers` | Scrolling the theme picker previews themes and Enter keeps one. Typing filters the background picker, Enter writes the choice to `~/.local/state/temple/background.path` and the lock screen link, Escape drops a preview, and scrolling picks another wallpaper. |
+| `clippy` | Clippy comes on screen while Voxtype records, stays while it transcribes, opens his balloon for Voxtype's notification, and leaves once Voxtype is idle and the balloon times out. |
+
+The screenshots the tests take are in the output path of the check.
 
 ## Include in a NixOS config
 

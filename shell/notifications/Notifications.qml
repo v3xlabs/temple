@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
 import "../macos"
+import "../tray"
 import "../windows"
 
 // Popups for new notifications, stacked at the bar's end of the screen in the theme's layout.
@@ -27,6 +28,13 @@ PanelWindow {
         // The newest popup sits nearest the bar.
         return Theme.barEdge === "bottom" ? popups.reverse() : popups;
     }
+
+    // A balloon tail tip sits this far from the balloon's right edge, over the clock, unless the sender has a tray icon.
+    readonly property int balloonTip: 22
+    readonly property real iconX: root.popup.layout === "balloon" && root.notifications.length > 0 ? TrayIcons.centre(root.screen, root.notifications[0]) : -1
+    readonly property int rightMargin: root.iconX < 0 ? 8 : Math.max(8, Math.min(root.screen.width - root.popup.width - 8, Math.round(root.screen.width - root.iconX - root.balloonTip)))
+    // The tail base spans from 32 px left to 8 px right of the tip and must stay clear of the rounded corners.
+    readonly property real tailX: root.iconX < 0 ? root.popup.width - root.balloonTip : Math.max(41, Math.min(root.popup.width - 17, root.iconX - (root.screen.width - root.rightMargin - root.popup.width)))
 
     function hide(notification: Notification, expired: bool) {
         root.shown = root.shown.filter(id => id !== notification.id && NotificationStore.live(id) !== null);
@@ -48,7 +56,7 @@ PanelWindow {
     margins {
         top: root.popup.margin
         bottom: root.popup.margin
-        right: 8
+        right: root.rightMargin
     }
     implicitWidth: root.popup.width
     implicitHeight: column.implicitHeight
@@ -368,17 +376,17 @@ PanelWindow {
                                     radiusX: 8
                                     radiusY: 8
                                 }
-                                // The tail points down at the tray.
+                                // The tail points down at the sender's tray icon or the clock.
                                 PathLine {
-                                    x: balloonShape.width - 30
+                                    x: root.tailX + 8
                                     y: balloonShape.bodyHeight
                                 }
                                 PathLine {
-                                    x: balloonShape.width - 22
+                                    x: root.tailX
                                     y: balloonShape.bodyHeight + balloonShape.tail - 0.5
                                 }
                                 PathLine {
-                                    x: balloonShape.width - 54
+                                    x: root.tailX - 32
                                     y: balloonShape.bodyHeight
                                 }
                                 PathLine {

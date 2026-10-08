@@ -124,13 +124,21 @@ PanelWindow {
         width: 400
         height: 540
         radius: 6
-        color: Qt.alpha(root.tint, 0.75)
+        color: Qt.alpha(root.tint, Theme.barTokens.win7.opacity)
         border.width: 1
         border.color: "#40ffffff"
 
         MouseArea {
             anchors.fill: parent
             onClicked: root.powerMenuOpen = false
+        }
+
+        // The body shade of assets/win7-taskbar.png, so the menu glass matches the taskbar.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: 5
+            color: "#3a000000"
         }
 
         Rectangle {

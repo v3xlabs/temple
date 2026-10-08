@@ -6,7 +6,11 @@
     ...
   }: let
     cfg = config.temple;
-    kwinThemes = pkgs.callPackage ./kwin.nix {inherit (cfg) themes;};
+    luna = pkgs.callPackage ./luna.nix {};
+    kwinThemes = pkgs.callPackage ./kwin.nix {
+      inherit (cfg) themes;
+      inherit luna;
+    };
     kitty = import ./kitty.nix;
     shellSource = self.packages.${pkgs.stdenv.hostPlatform.system}.shell;
 
@@ -489,6 +493,7 @@
           "temple/backgrounds.json".text = builtins.toJSON (map (background: "${background}") cfg.backgrounds);
           "temple/wallpapers".source = wallpapers;
           "temple/clippy".source = clippy;
+          "temple/luna".source = luna;
           "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
           "temple/share".source = "${sessionData}/share";
           # Locked, so the lock screen shows the Temple background even where

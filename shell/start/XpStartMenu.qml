@@ -11,6 +11,10 @@ import "../apps"
 import "../session"
 import "../windows"
 
+// The Luna Blue Start panel, assembled from the luna.msstyles bitmaps in
+// /etc/temple/luna/startpanel the way XP lays out StartPanel.* in
+// NORMALBLUE_INI: each pane's default size, sizing margins and content margins
+// come from there.
 PanelWindow {
     id: root
 
@@ -21,8 +25,11 @@ PanelWindow {
     property bool programsOpen: false
     // Window y of the All Programs row's bottom edge; the flyout grows upward from there.
     property real programsBottom: 0
+    // The selected row of the two columns, from the mouse or the arrow keys.
+    property Item current: null
 
     readonly property string home: Quickshell.env("HOME")
+    readonly property string bitmaps: "file:///etc/temple/luna/startpanel/"
 
     function toggle(target: ShellScreen) {
         if (open) {
@@ -31,12 +38,14 @@ PanelWindow {
         }
         screen = target;
         programsOpen = false;
+        current = null;
         open = true;
         focusScope.forceActiveFocus();
     }
 
     function close() {
         programsOpen = false;
+        current = null;
         open = false;
     }
 
@@ -49,13 +58,20 @@ PanelWindow {
         }
     }
 
+    onCurrentChanged: {
+        if (current !== null && current !== allPrograms)
+            programsOpen = false;
+    }
+
     function openFolder(path: string) {
         close();
         Quickshell.execDetached(["xdg-open", path]);
     }
 
-    function openPrograms() {
+    function openPrograms(fromKeyboard: bool) {
         programsBottom = allPrograms.mapToItem(root.contentItem, 0, allPrograms.height).y;
+        programList.currentIndex = fromKeyboard ? 0 : -1;
+        programList.positionViewAtBeginning();
         programsOpen = true;
     }
 
@@ -69,6 +85,48 @@ PanelWindow {
     function confirmOn(target: ShellScreen, action: string) {
         close();
         sessionDialog.show(target, action === "logout" ? "logoff" : "shutdown");
+    }
+
+    function rows(column: Item): var {
+        return Array.from(column.children).filter(child => child.navigable === true && child.visible);
+    }
+
+    // Up and Down move inside a column and wrap; Left and Right change column;
+    // Right on All Programs opens the flyout, which then takes Up, Down and Left.
+    function navigate(key: int): bool {
+        const enter = key === Qt.Key_Return || key === Qt.Key_Enter;
+        if (programsOpen && programList.currentIndex >= 0) {
+            if (key === Qt.Key_Up)
+                programList.decrementCurrentIndex();
+            else if (key === Qt.Key_Down)
+                programList.incrementCurrentIndex();
+            else if (key === Qt.Key_Left)
+                programsOpen = false;
+            else if (enter)
+                programList.currentItem.launch();
+            else
+                return false;
+            return true;
+        }
+        const columns = [rows(leftColumn).concat([allPrograms]), rows(rightColumn)];
+        const side = columns[1].includes(current) ? 1 : 0;
+        const column = columns[side];
+        const index = column.indexOf(current);
+        if (key === Qt.Key_Down)
+            current = column[(index + 1) % column.length];
+        else if (key === Qt.Key_Up)
+            current = column[index <= 0 ? column.length - 1 : index - 1];
+        else if (key === Qt.Key_Right && current === allPrograms)
+            openPrograms(true);
+        else if (key === Qt.Key_Right && side === 0)
+            current = columns[1][Math.min(Math.max(index, 0), columns[1].length - 1)];
+        else if (key === Qt.Key_Left && side === 1)
+            current = columns[0][Math.min(index, columns[0].length - 1)];
+        else if (enter && current !== null)
+            current.activated();
+        else
+            return false;
+        return true;
     }
 
     visible: open
@@ -85,21 +143,32 @@ PanelWindow {
     }
     color: "transparent"
 
-    component MenuRow: Rectangle {
+    // XP fills the selected row with the system highlight colour; luna.msstyles
+    // has no bitmap for it.
+    component Highlight: Rectangle {
+        color: "#316ac5"
+    }
+
+    component MenuRow: Item {
         id: row
 
         property string label
         property string icon
         property int iconSize: 32
         property bool bold: false
-        property color textColor: "#000000"
+        property color textColor
+        readonly property bool navigable: true
+        readonly property bool highlighted: root.current === row
 
         signal activated
-        signal hovered
 
         Layout.fillWidth: true
         implicitHeight: row.iconSize + 8
-        color: rowArea.containsMouse ? "#316ac5" : "transparent"
+
+        Highlight {
+            anchors.fill: parent
+            visible: row.highlighted
+        }
 
         RowLayout {
             anchors.fill: parent
@@ -116,7 +185,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 text: row.label
                 elide: Text.ElideRight
-                color: rowArea.containsMouse ? "#ffffff" : row.textColor
+                color: row.highlighted ? "#ffffff" : row.textColor
                 font.family: Theme.fontSans
                 font.pixelSize: Theme.fontSize
                 font.bold: row.bold
@@ -124,49 +193,31 @@ PanelWindow {
         }
 
         MouseArea {
-            id: rowArea
-
             anchors.fill: parent
             hoverEnabled: true
-            onEntered: row.hovered()
+            onEntered: root.current = row
+            onExited: {
+                if (root.current === row)
+                    root.current = null;
+            }
             onClicked: row.activated()
         }
     }
 
-    component Separator: Rectangle {
-        Layout.fillWidth: true
-        Layout.leftMargin: 8
-        Layout.rightMargin: 8
+    // ProgListSeparator and PlacesListSeparator: TrueSize bitmaps.
+    component Separator: Image {
+        Layout.alignment: Qt.AlignHCenter
         Layout.topMargin: 3
         Layout.bottomMargin: 3
-        implicitHeight: 1
+        smooth: false
     }
 
-    component BlueBand: Gradient {
-        GradientStop {
-            position: 0
-            color: "#3d8af7"
-        }
-        GradientStop {
-            position: 0.12
-            color: "#2a7af0"
-        }
-        GradientStop {
-            position: 0.55
-            color: "#1c5fd9"
-        }
-        GradientStop {
-            position: 1
-            color: "#1650c8"
-        }
-    }
-
+    // A LogoffButtons icon: the normal strip, or the hot strip under the mouse.
     component FooterButton: Item {
         id: footerButton
 
         property string label
-        property string icon
-        property color tile
+        property string bitmap
 
         signal activated
 
@@ -179,21 +230,10 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 5
 
-            Rectangle {
+            Image {
                 anchors.verticalCenter: parent.verticalCenter
-                width: 24
-                height: 24
-                radius: 4
-                antialiasing: true
-                color: footerArea.containsMouse ? Qt.lighter(footerButton.tile, 1.2) : footerButton.tile
-                border.width: 1
-                border.color: "#ffffff"
-
-                IconImage {
-                    anchors.centerIn: parent
-                    implicitSize: 18
-                    source: Apps.iconSource(footerButton.icon)
-                }
+                source: root.bitmaps + footerButton.bitmap + (footerArea.containsMouse ? "-hot.png" : ".png")
+                smooth: false
             }
 
             Text {
@@ -202,7 +242,6 @@ PanelWindow {
                 color: "#ffffff"
                 font.family: Theme.fontSans
                 font.pixelSize: Theme.fontSize
-                font.underline: footerArea.containsMouse
             }
         }
 
@@ -228,97 +267,103 @@ PanelWindow {
         id: focusScope
 
         anchors.fill: parent
-        Keys.onEscapePressed: {
-            if (root.programsOpen)
-                root.programsOpen = false;
-            else
-                root.close();
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape) {
+                if (root.programsOpen)
+                    root.programsOpen = false;
+                else
+                    root.close();
+            } else {
+                event.accepted = root.navigate(event.key);
+            }
         }
     }
 
     Item {
         id: menu
 
-        readonly property int cornerRadius: 8
+        // StartPanel.*.DefaultPaneSize: a 380px panel, 64px user pane, two
+        // 190px columns at least 336px tall and a 40px log-off pane.
         readonly property int headerHeight: 64
-        readonly property int footerHeight: 44
+        readonly property int columnWidth: 190
+        readonly property int footerHeight: 40
+        readonly property int moreProgramsHeight: 30
 
         x: 0
         y: parent.height - height
-        width: 380
+        width: columnWidth * 2
         height: headerHeight + body.height + footerHeight
-        // Rounding only the top corners: the frame extends past the bottom edge and gets clipped.
-        clip: true
 
         MouseArea {
             anchors.fill: parent
         }
 
-        Rectangle {
-            width: parent.width
-            height: parent.height + menu.cornerRadius
-            radius: menu.cornerRadius
-            antialiasing: true
-            color: "#1650c8"
-        }
-
-        Item {
+        BorderImage {
             id: header
 
             width: parent.width
             height: menu.headerHeight
-            clip: true
+            source: root.bitmaps + "userpane.png"
+            border.left: 59
+            border.right: 60
+            border.top: 62
+            border.bottom: 0
+            smooth: false
 
-            Rectangle {
-                width: parent.width
-                height: parent.height + menu.cornerRadius
-                radius: menu.cornerRadius
-                antialiasing: true
-                gradient: BlueBand {}
-            }
-
-            Rectangle {
+            // StartPanel.UserPicture: the tile is stretched around a 48px picture
+            // inside its content margins (8, 6, 8, 6).
+            BorderImage {
                 id: picture
 
-                x: 8
-                anchors.verticalCenter: parent.verticalCenter
-                width: 48
-                height: 48
-                radius: 5
-                antialiasing: true
-                border.width: 2
-                border.color: "#ffffff"
-                gradient: Gradient {
-                    GradientStop {
-                        position: 0
-                        color: "#a9cdf7"
-                    }
-                    GradientStop {
-                        position: 1
-                        color: "#4f86dc"
-                    }
-                }
+                x: 1
+                y: 2
+                width: 62
+                height: 62
+                source: root.bitmaps + "usertile.png"
+                border.left: 6
+                border.right: 10
+                border.top: 6
+                border.bottom: 10
+                smooth: false
 
-                IconImage {
-                    anchors.centerIn: parent
-                    implicitSize: 36
-                    source: Apps.iconSource("user-identity")
+                Rectangle {
+                    x: 8
+                    y: 8
+                    width: 48
+                    height: 48
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: "#a9cdf7"
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "#4f86dc"
+                        }
+                    }
+
+                    IconImage {
+                        anchors.centerIn: parent
+                        implicitSize: 36
+                        source: Apps.iconSource("user-identity")
+                    }
                 }
             }
 
+            // StartPanel.UserPane: 14pt white text with a continuous 2px shadow.
             Item {
                 anchors.left: picture.right
-                anchors.leftMargin: 10
+                anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: userLabel.implicitWidth + 1
-                implicitHeight: userLabel.implicitHeight + 1
+                implicitWidth: userLabel.implicitWidth + 2
+                implicitHeight: userLabel.implicitHeight + 2
 
                 Text {
-                    x: 1
-                    y: 1
+                    x: 2
+                    y: 2
                     text: userLabel.text
                     font: userLabel.font
-                    color: Qt.rgba(0, 0, 0, 0.4)
+                    color: "#09428b"
                 }
 
                 Text {
@@ -327,29 +372,8 @@ PanelWindow {
                     text: Session.user
                     color: "#ffffff"
                     font.family: Theme.fontSans
-                    font.pixelSize: Theme.fontSize + 5
+                    font.pixelSize: 19
                     font.bold: true
-                }
-            }
-
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 2
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop {
-                        position: 0
-                        color: "#1650c8"
-                    }
-                    GradientStop {
-                        position: 0.5
-                        color: "#f0a050"
-                    }
-                    GradientStop {
-                        position: 1
-                        color: "#1650c8"
-                    }
                 }
             }
         }
@@ -357,24 +381,32 @@ PanelWindow {
         Item {
             id: body
 
-            x: 2
             y: menu.headerHeight
-            width: parent.width - 4
-            height: Math.max(372, leftColumn.implicitHeight, rightColumn.implicitHeight)
+            width: parent.width
+            // Content margins (top 9, bottom 5) of both lists come on top of their rows.
+            height: Math.max(336, leftColumn.implicitHeight + 14 + menu.moreProgramsHeight, rightColumn.implicitHeight + 14)
 
-            Rectangle {
+            // StartPanel.ProgList
+            BorderImage {
                 id: left
 
-                width: Math.round(parent.width * 0.52)
-                height: parent.height
-                color: "#ffffff"
+                width: menu.columnWidth
+                height: parent.height - menu.moreProgramsHeight
+                source: root.bitmaps + "proglist.png"
+                border.left: 2
+                border.right: 153
+                border.top: 3
+                border.bottom: 0
+                smooth: false
 
                 ColumnLayout {
                     id: leftColumn
 
                     anchors.fill: parent
-                    anchors.topMargin: 6
-                    anchors.bottomMargin: 6
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 4
+                    anchors.topMargin: 9
+                    anchors.bottomMargin: 5
                     spacing: 0
 
                     Repeater {
@@ -386,7 +418,7 @@ PanelWindow {
                             label: modelData.label
                             icon: modelData.icon ?? ""
                             bold: true
-                            onHovered: root.programsOpen = false
+                            textColor: "#373738"
                             onActivated: {
                                 root.close();
                                 Apps.run(modelData);
@@ -396,7 +428,7 @@ PanelWindow {
 
                     Separator {
                         visible: Apps.recentApplications.length > 0
-                        color: "#d6d3ce"
+                        source: root.bitmaps + "proglist-separator.png"
                     }
 
                     Repeater {
@@ -408,7 +440,7 @@ PanelWindow {
                             label: modelData.name
                             icon: modelData.icon
                             iconSize: 24
-                            onHovered: root.programsOpen = false
+                            textColor: "#373738"
                             onActivated: {
                                 root.close();
                                 Apps.launch(modelData);
@@ -421,98 +453,98 @@ PanelWindow {
                     }
 
                     Separator {
-                        color: "#d6d3ce"
-                    }
-
-                    Rectangle {
-                        id: allPrograms
-
-                        readonly property bool highlighted: allProgramsArea.containsMouse || root.programsOpen
-
-                        Layout.fillWidth: true
-                        implicitHeight: 30
-                        color: allPrograms.highlighted ? "#316ac5" : "transparent"
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 8
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "All Programs"
-                                color: allPrograms.highlighted ? "#ffffff" : "#000000"
-                                font.family: Theme.fontSans
-                                font.pixelSize: Theme.fontSize
-                                font.bold: true
-                            }
-
-                            Rectangle {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 20
-                                height: 20
-                                radius: 4
-                                antialiasing: true
-                                border.width: 1
-                                border.color: "#1f7a16"
-                                gradient: Gradient {
-                                    GradientStop {
-                                        position: 0
-                                        color: "#7ed96a"
-                                    }
-                                    GradientStop {
-                                        position: 1
-                                        color: "#2e9a22"
-                                    }
-                                }
-
-                                Canvas {
-                                    anchors.fill: parent
-                                    onPaint: {
-                                        const ctx = getContext("2d");
-                                        ctx.reset();
-                                        ctx.fillStyle = "#ffffff";
-                                        ctx.beginPath();
-                                        ctx.moveTo(width * 0.35, height * 0.25);
-                                        ctx.lineTo(width * 0.72, height * 0.5);
-                                        ctx.lineTo(width * 0.35, height * 0.75);
-                                        ctx.closePath();
-                                        ctx.fill();
-                                    }
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: allProgramsArea
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: root.openPrograms()
-                            onClicked: root.openPrograms()
-                        }
+                        source: root.bitmaps + "proglist-separator.png"
                     }
                 }
             }
 
-            Rectangle {
-                anchors.left: left.right
-                anchors.right: parent.right
-                height: parent.height
-                color: "#d3e5fa"
+            // StartPanel.MorePrograms, with MoreProgramsArrow (hot while selected).
+            BorderImage {
+                anchors.top: left.bottom
+                width: menu.columnWidth
+                height: menu.moreProgramsHeight
+                source: root.bitmaps + "moreprograms.png"
+                border.left: 3
+                border.right: 0
+                border.top: 0
+                border.bottom: 1
+                smooth: false
 
-                Rectangle {
-                    width: 1
-                    height: parent.height
-                    color: "#95bdee"
+                Item {
+                    id: allPrograms
+
+                    readonly property bool navigable: true
+                    readonly property bool highlighted: root.current === allPrograms || root.programsOpen
+
+                    signal activated
+
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    anchors.bottomMargin: 6
+                    onActivated: root.openPrograms(true)
+
+                    Highlight {
+                        anchors.fill: parent
+                        visible: allPrograms.highlighted
+                    }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 8
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "All Programs"
+                            color: allPrograms.highlighted ? "#ffffff" : "#373738"
+                            font.family: Theme.fontSans
+                            font.pixelSize: Theme.fontSize
+                            font.bold: true
+                        }
+
+                        Image {
+                            anchors.verticalCenter: parent.verticalCenter
+                            source: root.bitmaps + (allPrograms.highlighted ? "moreprograms-arrow-hot.png" : "moreprograms-arrow.png")
+                            smooth: false
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: {
+                            root.current = allPrograms;
+                            root.openPrograms(false);
+                        }
+                        onExited: {
+                            if (root.current === allPrograms)
+                                root.current = null;
+                        }
+                        onClicked: root.openPrograms(false)
+                    }
                 }
+            }
+
+            // StartPanel.PlacesList
+            BorderImage {
+                x: menu.columnWidth
+                width: menu.columnWidth
+                height: parent.height
+                source: root.bitmaps + "placeslist.png"
+                border.left: 172
+                border.right: 7
+                border.top: 3
+                border.bottom: 1
+                smooth: false
 
                 ColumnLayout {
                     id: rightColumn
 
                     anchors.fill: parent
-                    anchors.leftMargin: 1
-                    anchors.topMargin: 6
-                    anchors.bottomMargin: 6
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 6
+                    anchors.topMargin: 9
+                    anchors.bottomMargin: 5
                     spacing: 0
 
                     MenuRow {
@@ -521,7 +553,6 @@ PanelWindow {
                         iconSize: 24
                         bold: true
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: root.openFolder(root.home + "/Documents")
                     }
 
@@ -531,7 +562,6 @@ PanelWindow {
                         iconSize: 24
                         bold: true
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: root.openFolder(root.home + "/Pictures")
                     }
 
@@ -541,7 +571,6 @@ PanelWindow {
                         iconSize: 24
                         bold: true
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: root.openFolder(root.home + "/Music")
                     }
 
@@ -551,12 +580,11 @@ PanelWindow {
                         iconSize: 24
                         bold: true
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: root.openFolder(root.home + "/")
                     }
 
                     Separator {
-                        color: "#95bdee"
+                        source: root.bitmaps + "placeslist-separator.png"
                     }
 
                     MenuRow {
@@ -564,7 +592,6 @@ PanelWindow {
                         icon: "preferences-desktop-theme"
                         iconSize: 24
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: {
                             root.close();
                             root.themesRequested();
@@ -576,7 +603,6 @@ PanelWindow {
                         icon: "system-run"
                         iconSize: 24
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: {
                             root.close();
                             root.launcherRequested();
@@ -588,7 +614,6 @@ PanelWindow {
                         icon: "search"
                         iconSize: 24
                         textColor: "#0a246a"
-                        onHovered: root.programsOpen = false
                         onActivated: {
                             root.close();
                             root.launcherRequested();
@@ -602,35 +627,42 @@ PanelWindow {
             }
         }
 
-        Rectangle {
+        // StartPanel.Logoff
+        BorderImage {
             y: menu.headerHeight + body.height
             width: parent.width
             height: menu.footerHeight
-            gradient: BlueBand {}
+            source: root.bitmaps + "logoff.png"
+            border.left: 49
+            border.right: 47
+            border.top: 0
+            border.bottom: 38
+            smooth: false
 
             Row {
                 anchors.right: parent.right
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 1
                 spacing: 6
 
                 FooterButton {
                     label: "Log Off"
-                    icon: "system-log-out"
-                    tile: "#e8a21b"
+                    bitmap: "logoff-button"
                     onActivated: root.confirmSession("logoff")
                 }
 
                 FooterButton {
                     label: "Turn Off Computer"
-                    icon: "system-shutdown"
-                    tile: "#d9432f"
+                    bitmap: "turnoff-button"
                     onActivated: root.confirmSession("shutdown")
                 }
             }
         }
     }
 
+    // StartMenu::Toolbar: the All Programs flyout, with Toolbar.Button's hot and
+    // pressed images behind the selected entry.
     Item {
         id: programs
 
@@ -639,9 +671,10 @@ PanelWindow {
         visible: root.programsOpen
         x: menu.x + menu.width - 2
         width: 260
-        height: Math.min(programList.contentHeight + 4, programs.maxHeight)
+        height: Math.min(programList.contentHeight + 7, programs.maxHeight)
         y: Math.max(0, Math.min(root.programsBottom, root.height) - height)
 
+        // XP's menu drop shadow is a window effect, not part of the visual style.
         Rectangle {
             x: 3
             y: 3
@@ -650,11 +683,14 @@ PanelWindow {
             color: Qt.rgba(0, 0, 0, 0.3)
         }
 
-        Rectangle {
+        BorderImage {
             anchors.fill: parent
-            color: "#ffffff"
-            border.width: 1
-            border.color: "#7a96df"
+            source: root.bitmaps + "programs.png"
+            border.left: 6
+            border.right: 5
+            border.top: 3
+            border.bottom: 4
+            smooth: false
 
             MouseArea {
                 anchors.fill: parent
@@ -664,25 +700,42 @@ PanelWindow {
                 id: programList
 
                 anchors.fill: parent
-                anchors.margins: 2
+                anchors.topMargin: 3
+                anchors.bottomMargin: 4
+                anchors.rightMargin: 5
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: Apps.applications
 
                 ScrollBar.vertical: ScrollBar {}
 
-                delegate: Rectangle {
+                delegate: Item {
                     id: entry
 
                     required property DesktopEntry modelData
+                    required property int index
+                    readonly property bool highlighted: ListView.isCurrentItem
+
+                    function launch() {
+                        root.close();
+                        Apps.launch(entry.modelData);
+                    }
 
                     width: ListView.view.width
                     height: 22
-                    color: entryArea.containsMouse ? "#316ac5" : "transparent"
+
+                    BorderImage {
+                        anchors.fill: parent
+                        visible: entry.highlighted
+                        source: root.bitmaps + (entryArea.pressed ? "programs-item-pressed.png" : "programs-item-hot.png")
+                        border.left: 6
+                        border.right: 1
+                        smooth: false
+                    }
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 6
+                        anchors.leftMargin: 10
                         anchors.rightMargin: 10
                         spacing: 6
 
@@ -695,7 +748,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             text: entry.modelData.name
                             elide: Text.ElideRight
-                            color: entryArea.containsMouse ? "#ffffff" : "#000000"
+                            color: entry.highlighted ? "#ffffff" : "#000000"
                             font.family: Theme.fontSans
                             font.pixelSize: Theme.fontSize
                         }
@@ -706,10 +759,8 @@ PanelWindow {
 
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: {
-                            root.close();
-                            Apps.launch(entry.modelData);
-                        }
+                        onEntered: programList.currentIndex = entry.index
+                        onClicked: entry.launch()
                     }
                 }
             }

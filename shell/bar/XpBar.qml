@@ -343,6 +343,9 @@ PanelWindow {
                             width: 16
                             height: 16
 
+                            Component.onCompleted: TrayIcons.add(bar.screen, trayItem, trayItem.modelData)
+                            Component.onDestruction: TrayIcons.remove(trayItem)
+
                             IconImage {
                                 anchors.fill: parent
                                 implicitSize: 16
