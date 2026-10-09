@@ -98,9 +98,23 @@ ShellRoot {
         Clippy {}
     }
 
-    // KDE global shortcuts reach the shell through these; see the kglobalaccel
-    // component the NixOS module installs.
+    // Temple's own key binds arrive as kglobalaccel signals. The NixOS module
+    // registers them in the session-only component temple-shell.
+    Process {
+        running: true
+        command: ["busctl", "--user", "--json=short", "monitor", "--match", "type='signal',path='/component/temple_shell',interface='org.kde.kglobalaccel.Component',member='globalShortcutPressed'"]
+        stdout: SplitParser {
+            onRead: line => {
+                const message = JSON.parse(line);
+                if (message.member === "globalShortcutPressed")
+                    actions[message.payload.data[1].replace(/^_k_session:/, "")]();
+            }
+        }
+    }
+
     IpcHandler {
+        id: actions
+
         target: "shell"
 
         function reload(): void {

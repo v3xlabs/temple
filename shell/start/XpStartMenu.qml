@@ -27,6 +27,11 @@ PanelWindow {
     property real programsBottom: 0
     // The selected row of the two columns, from the mouse or the arrow keys.
     property Item current: null
+    // 0 to 1 while the panel scrolls up out of the taskbar, as XP's menu transition did.
+    property real reveal: 1
+    // XP's Start panel has no search box: typed text filters the All Programs flyout.
+    property string query: ""
+    readonly property var programs: query === "" ? Apps.applications : Apps.applications.filter(app => app.name.toLowerCase().includes(query.toLowerCase()))
 
     readonly property string home: Quickshell.env("HOME")
     readonly property string bitmaps: "file:///etc/temple/luna/startpanel/"
@@ -41,6 +46,7 @@ PanelWindow {
         current = null;
         open = true;
         focusScope.forceActiveFocus();
+        revealAnimation.restart();
     }
 
     function close() {
@@ -61,6 +67,19 @@ PanelWindow {
     onCurrentChanged: {
         if (current !== null && current !== allPrograms)
             programsOpen = false;
+    }
+
+    onProgramsOpenChanged: {
+        if (!programsOpen)
+            query = "";
+    }
+
+    function search(text: string) {
+        query = text;
+        if (text === "")
+            programsOpen = false;
+        else
+            openPrograms(true);
     }
 
     function openFolder(path: string) {
@@ -130,7 +149,9 @@ PanelWindow {
     }
 
     visible: open
-    WlrLayershell.namespace: "temple-startmenu"
+    // KWin types a layer surface by its namespace. "utility" keeps the Scale
+    // effect from growing the full-screen surface out of the screen centre.
+    WlrLayershell.namespace: "utility"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Normal
@@ -268,11 +289,16 @@ PanelWindow {
 
         anchors.fill: parent
         Keys.onPressed: event => {
+            const typed = event.text.length === 1 && event.text >= " " && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier));
             if (event.key === Qt.Key_Escape) {
                 if (root.programsOpen)
                     root.programsOpen = false;
                 else
                     root.close();
+            } else if (event.key === Qt.Key_Backspace && root.query !== "") {
+                root.search(root.query.slice(0, -1));
+            } else if (typed) {
+                root.search(root.query + event.text);
             } else {
                 event.accepted = root.navigate(event.key);
             }
@@ -290,9 +316,20 @@ PanelWindow {
         readonly property int moreProgramsHeight: 30
 
         x: 0
-        y: parent.height - height
+        y: parent.height - height * root.reveal
         width: columnWidth * 2
         height: headerHeight + body.height + footerHeight
+
+        NumberAnimation {
+            id: revealAnimation
+
+            target: root
+            property: "reveal"
+            from: 0
+            to: 1
+            duration: 150
+            easing.type: Easing.OutCubic
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -705,7 +742,35 @@ PanelWindow {
                 anchors.rightMargin: 5
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                model: Apps.applications
+                model: root.programs
+
+                header: Item {
+                    width: ListView.view.width
+                    height: root.query === "" ? 0 : 22
+                    visible: root.query !== ""
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 6
+
+                        IconImage {
+                            implicitSize: 16
+                            source: Apps.iconSource("search")
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.query
+                            elide: Text.ElideLeft
+                            color: "#000000"
+                            font.family: Theme.fontSans
+                            font.pixelSize: Theme.fontSize
+                            font.bold: true
+                        }
+                    }
+                }
 
                 ScrollBar.vertical: ScrollBar {}
 

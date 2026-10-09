@@ -147,30 +147,32 @@
     ipc = function: "${shell}/bin/qs -p /etc/temple/shell ipc call shell ${function}";
     kwinShortcut = name: "${pkgs.systemd}/bin/busctl --user call org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component invokeShortcut s ${lib.escapeShellArg name}";
 
+    # A bind runs either a `command`, or an `action`: a function of the shell's
+    # `shell` IPC target.
     defaultBinds = {
       start = {
         keys = ["Meta"];
-        command = ipc "toggleStart";
+        action = "toggleStart";
         description = "Start menu";
       };
       palette = {
         keys = ["Meta+K"];
-        command = ipc "togglePalette";
+        action = "togglePalette";
         description = "Command palette";
       };
       keybinds = {
         keys = ["Meta+/"];
-        command = ipc "toggleKeybinds";
+        action = "toggleKeybinds";
         description = "Show keybinds";
       };
       themes = {
         keys = ["Meta+T"];
-        command = ipc "toggleThemes";
+        action = "toggleThemes";
         description = "Pick theme";
       };
       backgrounds = {
         keys = ["Meta+B"];
-        command = ipc "toggleBackgrounds";
+        action = "toggleBackgrounds";
         description = "Pick background";
       };
       terminal = {
@@ -202,6 +204,8 @@
           description = lib.defaultTo bind.command bind.description;
         })
       cfg.keybinds;
+    actionBinds = lib.filterAttrs (_: bind: bind ? action) binds;
+    commandBinds = lib.filterAttrs (_: bind: bind ? command) binds;
 
     # A kglobalaccel component: KWin's shortcut daemon finds it in
     # share/kglobalaccel and runs an action's Exec when one of its keys is pressed.
@@ -211,7 +215,7 @@
       Name=Temple
       Exec=${ipc "toggleStart"}
       X-KDE-GlobalShortcutType=Service
-      Actions=${lib.concatStringsSep ";" (lib.attrNames binds)}
+      Actions=${lib.concatStringsSep ";" (lib.attrNames commandBinds)}
       ${lib.concatStrings (lib.mapAttrsToList (id: bind: ''
 
           [Desktop Action ${id}]
@@ -219,8 +223,53 @@
           Exec=${pkgs.writeShellScript "temple-${id}" bind.command}
           X-KDE-Shortcuts=${lib.concatStringsSep "," bind.keys}
         '')
-        binds)}
+        commandBinds)}
     '';
+
+    # kglobalaccel's D-Bus API takes a key as a Qt key code.
+    qtModifiers = {
+      Shift = 33554432;
+      Ctrl = 67108864;
+      Alt = 134217728;
+      Meta = 268435456;
+    };
+    qtNamedKeys =
+      {
+        Meta = 16777250;
+        Escape = 16777216;
+        Tab = 16777217;
+        Return = 16777220;
+        Space = 32;
+      }
+      // lib.listToAttrs (lib.genList (n: lib.nameValuePair "F${toString (n + 1)}" (16777264 + n)) 12);
+    qtKey = key: let
+      parts = lib.splitString "+" key;
+      name = lib.last parts;
+      code =
+        qtNamedKeys.${
+          name
+        }
+        or (
+          if lib.stringLength name == 1
+          then lib.strings.charToInt (lib.toUpper name)
+          else throw "temple: no Qt key code for \"${name}\" in ${key}"
+        );
+    in
+      lib.foldl' (sum: modifier: sum + qtModifiers.${modifier}) code (lib.init parts);
+
+    # The shell's actions are kglobalaccel shortcuts of their own. A key press
+    # reaches the shell as a D-Bus signal, with no process to start, so text
+    # typed right after Super lands in the start menu. The `_k_session:` prefix
+    # keeps them out of kglobalshortcutsrc, where plain Plasma would see them.
+    # setShortcut's flags 6 are SetPresent and NoAutoloading.
+    registerActions = pkgs.writeShellScript "temple-register-actions" (lib.concatStrings (lib.mapAttrsToList (_: bind: let
+        id = "4 temple-shell ${lib.escapeShellArg "_k_session:${bind.action}"} 'Temple shell' ${lib.escapeShellArg bind.description}";
+        accel = "${pkgs.systemd}/bin/busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel";
+      in ''
+        ${accel} doRegister as ${id}
+        ${accel} setShortcut asaiu ${id} ${toString (lib.length bind.keys)} ${lib.concatMapStringsSep " " (key: toString (qtKey key)) bind.keys} 6 >/dev/null
+      '')
+      actionBinds));
 
     # KWin shares the window list and window previews only with binaries a
     # desktop file names. The nixpkgs KWin resolves the `.quickshell-wrapped`
@@ -551,6 +600,8 @@
           serviceConfig = {
             ExecCondition = inTemple;
             ExecStart = "${shell}/bin/qs -p /etc/temple/shell";
+            # `-`: a failed registration must not stop the shell.
+            ExecStartPost = "-${registerActions}";
             Restart = "on-failure";
             Slice = "session.slice";
           };

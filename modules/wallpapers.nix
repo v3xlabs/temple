@@ -22,7 +22,6 @@
     name = "win7-wallpapers";
     url = "https://archive.org/download/windows-7-default-wallpapers/Windows%207%20Default%20Wallpapers.zip";
     hash = "sha256-q2iIa/GSI77l9xO7JrjKf4Us8sd/z70cJhpUW2svYcY=";
-    stripRoot = false;
   };
   macos = name: hash:
     fetchurl {

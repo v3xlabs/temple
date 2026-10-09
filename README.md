@@ -76,7 +76,7 @@ temple.keybinds.terminal = {
 
 Pick Temple in SDDM. The Temple session starts the same Plasma services as the Plasma session, apart from plasmashell and the splash screen. Both sessions share one KDE config and one KWallet, so apps such as Chromium and Signal keep their stored secrets in either session.
 
-Temple's shortcuts are a KDE global shortcut component named Temple, present only in the Temple session. System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma settings.
+Temple's shortcuts are two KDE global shortcut components, present only in the Temple session. The shell's own actions (Super, Super+K, Super+/, Super+T, Super+B) are the component "Temple shell": the shell registers them for the session only and gets each key press as a D-Bus signal, so text typed right after Super lands in the Start menu. System Settings can rebind them until the next login. The commands are the component "Temple": System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma settings.
 
 `temple.bar.monitors` names the screens that get a bar, by connector name as `kscreen-doctor -o` prints it. An empty list puts a bar on every screen.
 

@@ -53,6 +53,7 @@ PanelWindow {
         search.text = "";
         open = true;
         search.forceActiveFocus();
+        fadeIn.restart();
     }
 
     function close() {
@@ -94,7 +95,9 @@ PanelWindow {
     }
 
     visible: open
-    WlrLayershell.namespace: "temple-startmenu"
+    // KWin types a layer surface by its namespace. "utility" keeps the Scale
+    // effect from growing the full-screen surface out of the screen centre.
+    WlrLayershell.namespace: "utility"
     BackgroundEffect.blurRegion: Region {
         item: Theme.blur ? menu : null
         radius: menu.radius
@@ -127,6 +130,15 @@ PanelWindow {
         color: Qt.alpha(root.tint, Theme.barTokens.win7.opacity)
         border.width: 1
         border.color: "#40ffffff"
+
+        NumberAnimation on opacity {
+            id: fadeIn
+
+            from: 0
+            to: 1
+            duration: 150
+            easing.type: Easing.OutCubic
+        }
 
         MouseArea {
             anchors.fill: parent
