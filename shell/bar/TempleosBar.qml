@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
 import "../activate"
+import "../health"
 import "../config"
 import "../tray"
 import "../notifications"
@@ -157,6 +158,10 @@ PanelWindow {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         spacing: 16
+
+        HealthIcon {
+            anchors.verticalCenter: parent.verticalCenter
+        }
 
         NotificationBell {
             anchors.verticalCenter: parent.verticalCenter

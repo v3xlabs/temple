@@ -559,6 +559,13 @@
             [General]
             IgnoreImages=false
           '';
+          # The shell warns about low disk space itself (shell/health), so
+          # Plasma's free space notifier would warn twice. Locked, and only in
+          # the Temple session; kded still reads the file by its KF5 name.
+          "temple/xdg/kded5rc".text = ''
+            [Module-freespacenotifier]
+            autoload[$i]=false
+          '';
         }
         // lib.concatMapAttrs themeFiles cfg.themes;
 

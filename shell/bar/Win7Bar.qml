@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "../theme"
 import "../clock"
+import "../health"
 import "../activate"
 import "../notifications"
 import "../tray"
@@ -138,6 +139,11 @@ PanelWindow {
             Layout.alignment: Qt.AlignVCenter
             Layout.rightMargin: 4
             spacing: 8
+
+            HealthIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                size: 16
+            }
 
             NotificationBell {
                 anchors.verticalCenter: parent.verticalCenter

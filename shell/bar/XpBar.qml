@@ -7,6 +7,7 @@ import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../clock"
+import "../health"
 import "../activate"
 import "../notifications"
 import "../tray"
@@ -155,6 +156,11 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     x: 19
                     spacing: 6
+
+                    HealthIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        size: 16
+                    }
 
                     NotificationBell {
                         anchors.verticalCenter: parent.verticalCenter

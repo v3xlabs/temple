@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "../windows"
 import "../activate"
+import "../health"
 import "../tray"
 import "../notifications"
 import "../macos"
@@ -102,6 +103,11 @@ PanelWindow {
                     onWheel: wheel => trayItem.modelData.scroll(wheel.angleDelta.y, false)
                 }
             }
+        }
+
+        HealthIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            size: 16
         }
 
         ActivateToggle {

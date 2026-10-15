@@ -14,7 +14,7 @@ Singleton {
     property var history: []
     property int unread: 0
     property bool doNotDisturb: false
-    // Set while Clippy is loaded; he then shows Voxtype's notifications in his balloon.
+    // Set while Clippy is loaded; he then shows the notifications of Voxtype and of the shell's health warnings in his balloon.
     property bool assistant: false
 
     signal popupRequested(Notification notification)
@@ -142,7 +142,7 @@ Singleton {
             if (root.doNotDisturb) {
                 if (notification.transient)
                     notification.expire();
-            } else if (root.assistant && notification.appName === "Voxtype")
+            } else if (root.assistant && ["Voxtype", "System Health"].includes(notification.appName))
                 root.assistantRequested(notification);
             else
                 root.popupRequested(notification);
