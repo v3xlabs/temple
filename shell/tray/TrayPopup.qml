@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import "../frame"
 
 // A flyout attached to a tray icon. It opens away from the bar and right-aligns with the icon.
 PopupWindow {
@@ -60,31 +59,8 @@ PopupWindow {
             anchors.topMargin: TrayStyle.opensDown ? popup.gap : 0
             anchors.bottomMargin: TrayStyle.opensDown ? 0 : popup.gap
 
-            Frame {
+            TrayFrame {
                 anchors.fill: parent
-                color: TrayStyle.popup.color
-                border: TrayStyle.popup.border
-                radius: TrayStyle.popup.radius
-            }
-
-            // Aero sheen across the top of the glass.
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: 1
-                height: 48
-                radius: 5
-                gradient: Gradient {
-                    GradientStop {
-                        position: 0
-                        color: TrayStyle.popup.sheen
-                    }
-                    GradientStop {
-                        position: 1
-                        color: Qt.alpha(TrayStyle.popup.sheen, 0)
-                    }
-                }
             }
 
             Column {

@@ -14,6 +14,7 @@ A desktop built on KDE Plasma 6 and Quickshell, packaged as a NixOS module. It a
 - `shell/` is the Quickshell config. `theme/Theme.qml` reads every theme from `/etc/temple/themes.json` and `Background.qml` reads `/etc/temple/backgrounds.json`. Both hot-reload.
 - `shell/osd/Osd.qml` replaces plasmashell's volume and brightness pop-up. It shows when the volume or mute state of the default PipeWire output changes, and when powerdevil reports a change from the brightness keys (its `org.kde.ScreenBrightness` `BrightnessChanged` signal, read through `busctl --user monitor`). It hides 1.5 s after the last change.
 - `shell/notifications/Notifications.qml` shows the notification popups. The XP themes draw a balloon. Its tail points at the tray icon of the app that sent the notification (when the status notifier id or title is the same as the notification's app name or desktop entry, ignoring case and separators), else at the clock. The XP bars publish their tray icons through `shell/tray/TrayIcons.qml`.
+- `shell/clipboard/Clipboard.qml` is the clipboard history that Super+V opens, framed like the theme's tray flyouts. Klipper, Plasma's clipboard manager, runs inside plasmashell, which the Temple session does not start. So the shell loads Klipper's history model from plasma-workspace's `org.kde.plasma.private.clipboard` QML module. The model records each copy into `~/.local/share/klipper/history3.sqlite` and reads `klipperrc`, the same files as plain Plasma, so the history and the clipboard settings carry over between the sessions. Klipper's own popup, D-Bus service and shortcuts do not run in the Temple session. Klipper ignores images by default; `/etc/temple/xdg/klipperrc` makes it keep them in the Temple session. That setting is not locked, so an `IgnoreImages` in `~/.config/klipperrc`, which Klipper's settings write under plain Plasma, wins.
 - `hosts/vm.nix` is the test VM. It autologs the `temple` user into the Temple session.
 
 ## Themes
@@ -51,6 +52,7 @@ nix build -L --no-link 'path:.#checks.x86_64-linux.<name>'
 | `picker-screens` | On three screens, Super+T and the launcher open one theme picker, on the screen of the active window. Arrows preview themes and Escape restores the first one. |
 | `pickers` | Scrolling the theme picker previews themes and Enter keeps one. Typing filters the background picker, Enter writes the choice to `~/.local/state/temple/background.path` and the lock screen link, Escape drops a preview, and scrolling picks another wallpaper. |
 | `clippy` | Clippy comes on screen while Voxtype records, stays while it transcribes, opens his balloon for Voxtype's notification, and leaves once Voxtype is idle and the balloon times out. |
+| `clipboard` | Copies show in the Super+V history in the XP, Windows 7, macOS and TempleOS styles. Escape leaves the clipboard as it was, Enter on an older entry puts that entry back on the clipboard, and typing filters the entries. With no `klipperrc` of the user's own, an image copy is kept, shows a thumbnail, and Enter puts the image back. |
 
 The screenshots the tests take are in the output path of the check.
 
@@ -76,7 +78,7 @@ temple.keybinds.terminal = {
 
 Pick Temple in SDDM. The Temple session starts the same Plasma services as the Plasma session, apart from plasmashell and the splash screen. Both sessions share one KDE config and one KWallet, so apps such as Chromium and Signal keep their stored secrets in either session.
 
-Temple's shortcuts are two KDE global shortcut components, present only in the Temple session. The shell's own actions (Super, Super+K, Super+/, Super+T, Super+B) are the component "Temple shell": the shell registers them for the session only and gets each key press as a D-Bus signal, so text typed right after Super lands in the Start menu. System Settings can rebind them until the next login. The commands are the component "Temple": System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma settings.
+Temple's shortcuts are two KDE global shortcut components, present only in the Temple session. The shell's own actions (Super, Super+K, Super+/, Super+T, Super+B, Super+V) are the component "Temple shell": the shell registers them for the session only and gets each key press as a D-Bus signal, so text typed right after Super lands in the Start menu. System Settings can rebind them until the next login. The commands are the component "Temple": System Settings lists them under Shortcuts and can rebind them. A `temple.keybinds` entry with the same key as a default below replaces that default. KWin's own shortcuts, such as window tiling, virtual desktops and Print, keep their Plasma settings.
 
 `temple.bar.monitors` names the screens that get a bar, by connector name as `kscreen-doctor -o` prints it. An empty list puts a bar on every screen.
 
@@ -89,6 +91,7 @@ Temple's shortcuts are two KDE global shortcut components, present only in the T
 | Start button | Start menu in the style of the theme: pinned and recent programs, All Programs, folders, and Log off / Shut down behind a confirmation dialog |
 | Super+T | Theme picker |
 | Super+B | Background picker: `temple.backgrounds`, the images in `~/Pictures/Wallpapers`, and the default wallpapers of Windows XP, Windows 7, macOS Sequoia and macOS Tahoe |
+| Super+V | Clipboard history, newest first. Type to filter, arrows to select, Enter to put the selected entry back on the clipboard, Escape to close |
 | Super+Return | Terminal (`temple.terminal`) |
 | Alt+K | Terminal (`temple.terminal`) |
 | Super+/ | Show Temple's keybinds |

@@ -3,6 +3,7 @@ singleton TrayIcons 1.0 TrayIcons.qml
 Volume 1.0 Volume.qml
 Network 1.0 Network.qml
 TrayPopup 1.0 TrayPopup.qml
+TrayFrame 1.0 TrayFrame.qml
 TrayTooltip 1.0 TrayTooltip.qml
 TrayRow 1.0 TrayRow.qml
 TrayIcon 1.0 TrayIcon.qml
