@@ -4,7 +4,7 @@ import Quickshell
 import "../theme"
 
 // The `bar` tokens of the last macOS theme, typed. Each macOS release is a
-// skin that differs only in these tokens.
+// theme that differs only in these tokens.
 Singleton {
     readonly property var tokens: Theme.barTokens.macos
 

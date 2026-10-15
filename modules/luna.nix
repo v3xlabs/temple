@@ -11,6 +11,11 @@
 #
 # startpanel/ holds the Start menu for shell/start/XpStartMenu.qml, from
 # StartPanel.* and StartMenu::Toolbar.*.
+#
+# dialog/ holds the controls of shell/clock/XpDateTime.qml: push buttons,
+# tabs, the tab pane and body, group boxes, combo box and spin buttons and
+# check boxes. `[button.pushbutton]`, `[Tab.*]`, `[Combobox.DropDownButton]`,
+# `[Spin.*]` and `[button.checkbox]` give their frame counts.
 {
   fetchurl,
   imagemagick,
@@ -23,28 +28,47 @@ runCommand "temple-luna" {nativeBuildInputs = [p7zip imagemagick];} ''
     hash = "sha256-3Y6G5afBnqn+DjSZK6vv5ZIFXWjrhll2PIMAVYyl3LQ=";
   }} >/dev/null
   cd src/.rsrc/BITMAP
-  mkdir -p $out/frame $out/startpanel
+  mkdir -p $out/frame $out/startpanel $out/dialog
 
-  # cut <bitmap> <name> <frame width> <frame height> <frame names...>
+  # cut <bitmap> <dir/name> <frame width> <frame height> <frame names...>
   cut() {
     local bitmap=$1 name=$2 width=$3 height=$4 i=0
     shift 4
     for frame in "$@"; do
-      magick BLUE_''${bitmap}_BMP.bmp -crop "''${width}x''${height}+0+$((i * height))" +repage -transparent '#ff00ff' "$out/frame/$name-$frame.png"
+      magick BLUE_''${bitmap}_BMP.bmp -crop "''${width}x''${height}+0+$((i * height))" +repage -transparent '#ff00ff' "$out/$name-$frame.png"
       i=$((i + 1))
     done
   }
-  cut FRAMECAPTION caption 66 29 active inactive
-  cut FRAMEMAXIMIZED maximized 66 29 active inactive
-  cut FRAMELEFT left 5 31 active inactive
-  cut FRAMERIGHT right 5 31 active inactive
-  cut FRAMEBOTTOM bottom 49 5 active inactive
+  cut FRAMECAPTION frame/caption 66 29 active inactive
+  cut FRAMEMAXIMIZED frame/maximized 66 29 active inactive
+  cut FRAMELEFT frame/left 5 31 active inactive
+  cut FRAMERIGHT frame/right 5 31 active inactive
+  cut FRAMEBOTTOM frame/bottom 49 5 active inactive
   states="0 1 2 3 4 5 6 7"
-  cut CAPTIONBUTTON button 21 21 $states
-  cut CLOSEBUTTON close 21 21 $states
+  cut CAPTIONBUTTON frame/button 21 21 $states
+  cut CLOSEBUTTON frame/close 21 21 $states
   for glyph in CLOSE MINIMIZE MAXIMIZE RESTORE; do
-    cut ''${glyph}GLYPH "$(echo $glyph | tr A-Z a-z)-glyph" 13 13 $states
+    cut ''${glyph}GLYPH "frame/$(echo $glyph | tr A-Z a-z)-glyph" 13 13 $states
   done
+
+  cut BUTTON dialog/button 20 23 normal hot pressed disabled default
+  tabstates="normal hot selected disabled focused"
+  cut TABITEM dialog/tab 18 18 $tabstates
+  cut TABITEMLEFT dialog/tab-left 18 18 $tabstates
+  cut TABITEMTOP dialog/tab-top 18 18 $tabstates
+  cut TABITEMTOPLEFT dialog/tab-top-left 18 18 $tabstates
+  cut TABPANEEDGE dialog/tabpane 48 48 normal
+  # The tenth column of the tab body is a purple marker, not part of the gradient.
+  cut TABBACKGROUND dialog/tabbody 9 600 normal
+  cut GROUPBOX dialog/groupbox 22 20 normal
+  buttonstates="normal hot pressed disabled"
+  cut COMBOBUTTON dialog/combo 15 16 $buttonstates
+  cut COMBOBUTTONGLYPH dialog/combo-glyph 10 7 $buttonstates
+  cut SPINBUTTONBACKGROUNDUP dialog/spinup 15 16 $buttonstates
+  cut SPINBUTTONBACKGROUNDDOWN dialog/spindown 15 16 $buttonstates
+  cut SPINUPGLYPH dialog/spinup-glyph 7 6 $buttonstates
+  cut SPINDOWNGLYPH dialog/spindown-glyph 7 6 $buttonstates
+  cut CHECKBOX13 dialog/checkbox 13 13 unchecked unchecked-hot unchecked-pressed unchecked-disabled checked checked-hot checked-pressed checked-disabled mixed mixed-hot mixed-pressed mixed-disabled
 
   # This header puts the pixels at byte 56; XP reads them from byte 54, right
   # after the header, and gets the blue that FillColorHint names.

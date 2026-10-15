@@ -26,7 +26,7 @@ test {
     for text in ["first", "second", "third"]:
         copy(text)
 
-    for name in ["xp", "win7-aero", "macos-tahoe", "templeos"]:
+    for name in ["xp-luna", "win7-aero", "macos-tahoe", "templeos"]:
         with subtest(f"{name}: Super+V shows the history, and Escape leaves the clipboard as it was"):
             machine.succeed(ipc + f"theme set {name}")
             time.sleep(4)

@@ -330,6 +330,7 @@ PanelWindow {
             color: TrayStyle.popup.color
             border: TrayStyle.popup.border
             radius: TrayStyle.popup.radius
+            sheet: TrayStyle.popup.sheet
             title: root.title
         }
 

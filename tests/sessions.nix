@@ -51,9 +51,9 @@ in
       with subtest("a theme switch moves the decoration and switcher, and windows stay decorated"):
           temple.succeed(user + "systemd-run --user --collect konsole")
           wait_for("konsole", lambda: [w for w in windows(temple) if w["resourceClass"] == "org.kde.konsole"])
-          temple.succeed(ipc + "theme set xp")
-          wait_for("the XP decoration", lambda: "Theme: temple-xp\n" in kwin_support_information(temple))
-          assert temple.succeed(session_kwinrc.format("TabBox", "LayoutName")).strip() == "temple-xp"
+          temple.succeed(ipc + "theme set xp-luna")
+          wait_for("the XP decoration", lambda: "Theme: temple-xp-luna\n" in kwin_support_information(temple))
+          assert temple.succeed(session_kwinrc.format("TabBox", "LayoutName")).strip() == "temple-xp-luna"
           time.sleep(2)
           wait_for(
               "a decorated konsole",
@@ -61,7 +61,7 @@ in
           )
           log = kwin_log(temple)
           assert "Failed to initialize decoration theme" not in log and "Could not locate decoration plugin" not in log
-          temple.screenshot("temple-xp")
+          temple.screenshot("temple-xp-luna")
 
       with subtest("neither session writes Temple settings into ~/.config/kwinrc"):
           assert_kwinrc_untouched(temple)

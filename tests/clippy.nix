@@ -12,7 +12,7 @@ in
   test {
     name = "clippy";
     nodes.machine = {
-      temple.theme = "xp";
+      temple.theme = "xp-luna";
       environment.systemPackages = [pkgs.libnotify bridge];
     };
     testScript = ''

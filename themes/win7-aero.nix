@@ -1,4 +1,4 @@
-# Aero glass: the bar draws aero.msstyles bitmaps over a light blue tint. Everything else is Windows 7 Black.
+# Aero glass over a light blue tint. Everything else is Windows 7 Black, whose flyouts are a white sheet in any glass.
 let
   black = import ./win7-black.nix;
   tint = "#74b8fc";
@@ -6,7 +6,6 @@ in
   black
   // {
     label = "Windows 7 Aero";
-    skin = "msstyles";
     bar =
       black.bar
       // {
@@ -17,6 +16,5 @@ in
       black.tray
       // {
         popup = black.tray.popup // {color = tint + "e0";};
-        tip = black.tray.tip // {color = tint + "f2";};
       };
   }

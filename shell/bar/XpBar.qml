@@ -6,21 +6,23 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
-import "../theme"
+import "../clock"
 import "../activate"
-import "../tray"
 import "../notifications"
+import "../tray"
 import "../windows"
 
+// The captured Start label preserves XP's GDI text rasterization.
 PanelWindow {
     id: bar
 
     signal startRequested
 
-    readonly property var tokens: Theme.barTokens.xp
+    property bool startOpen: false
 
-    function shaded(base, factor) {
-        return factor >= 1 ? Qt.lighter(base, factor) : Qt.darker(base, 1 / factor);
+    FontLoader {
+        id: tahoma
+        source: "assets/xp-tahoma.ttf"
     }
 
     WlrLayershell.namespace: "temple-bar"
@@ -30,141 +32,26 @@ PanelWindow {
         left: true
         right: true
     }
-    implicitHeight: bar.tokens.height
+    implicitHeight: 30
     color: "transparent"
 
-    Rectangle {
+    BorderImage {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop {
-                position: 0
-                color: bar.tokens.taskbarTop
-            }
-            GradientStop {
-                position: 0.1
-                color: bar.tokens.taskbarMid
-            }
-            GradientStop {
-                position: 0.8
-                color: bar.tokens.taskbarMid
-            }
-            GradientStop {
-                position: 1
-                color: bar.tokens.taskbarBottom
-            }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Qt.lighter(bar.tokens.taskbarTop, 1.25)
-        }
+        source: "assets/xp-taskbar.png"
+        border.top: 15
+        border.bottom: 11
+        horizontalTileMode: BorderImage.Repeat
+        verticalTileMode: BorderImage.Repeat
+        smooth: false
 
         RowLayout {
             anchors.fill: parent
             spacing: 0
 
-            Item {
-                id: startButton
-
-                readonly property real shade: startArea.pressed ? 0.85 : startArea.containsMouse ? 1.1 : 1
-                readonly property int cornerRadius: 10
-
-                Layout.fillHeight: true
-                Layout.preferredWidth: startContent.implicitWidth + 30
-                // Rounding only the right corners: the faces extend past the left edge and get clipped.
-                clip: true
-
-                Rectangle {
-                    x: -startButton.cornerRadius
-                    width: parent.width + startButton.cornerRadius
-                    height: parent.height
-                    radius: startButton.cornerRadius
-                    antialiasing: true
-                    color: Qt.darker(bar.tokens.startBottom, 1.5)
-                }
-
-                Rectangle {
-                    x: -startButton.cornerRadius
-                    width: parent.width + startButton.cornerRadius - 2
-                    height: parent.height
-                    radius: startButton.cornerRadius
-                    antialiasing: true
-                    gradient: Gradient {
-                        GradientStop {
-                            position: 0
-                            color: bar.shaded(bar.tokens.startTop, startButton.shade)
-                        }
-                        GradientStop {
-                            position: 0.45
-                            color: bar.shaded(bar.tokens.startMid, startButton.shade)
-                        }
-                        GradientStop {
-                            position: 1
-                            color: bar.shaded(bar.tokens.startBottom, startButton.shade)
-                        }
-                    }
-                }
-
-                Row {
-                    id: startContent
-
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: startArea.pressed ? 1 : 0
-                    x: 10
-                    spacing: 5
-
-                    Grid {
-                        anchors.verticalCenter: parent.verticalCenter
-                        columns: 2
-                        spacing: 1
-                        transform: Matrix4x4 {
-                            matrix: Qt.matrix4x4(1, -0.15, 0, 2, 0.1, 1, 0, -1, 0, 0, 1, 0, 0, 0, 0, 1)
-                        }
-
-                        // Logo colours of the flag mark, intentionally independent of the theme palette.
-                        Repeater {
-                            model: ["#f25022", "#7fba00", "#00a4ef", "#ffb900"]
-
-                            Rectangle {
-                                id: pane
-
-                                required property color modelData
-
-                                width: 7
-                                height: 7
-                                radius: 1.5
-                                antialiasing: true
-                                color: pane.modelData
-                            }
-                        }
-                    }
-
-                    Item {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: startLabel.implicitWidth + 1
-                        implicitHeight: startLabel.implicitHeight + 1
-
-                        Text {
-                            x: 1
-                            y: 1
-                            text: startLabel.text
-                            font: startLabel.font
-                            color: Qt.rgba(0, 0, 0, 0.45)
-                        }
-
-                        Text {
-                            id: startLabel
-
-                            text: "start"
-                            color: bar.tokens.text
-                            font.family: Theme.fontSans
-                            font.pixelSize: Theme.fontSize + 3
-                            font.bold: true
-                            font.italic: true
-                        }
-                    }
-                }
+            Image {
+                Layout.alignment: Qt.AlignTop
+                source: startArea.pressed || bar.startOpen ? "assets/xp-start-pressed.png" : startArea.containsMouse ? "assets/xp-start-hover.png" : "assets/xp-start-normal.png"
+                smooth: false
 
                 MouseArea {
                     id: startArea
@@ -186,7 +73,7 @@ PanelWindow {
                 Row {
                     id: taskRow
 
-                    anchors.verticalCenter: parent.verticalCenter
+                    height: parent.height
                     spacing: 3
 
                     Repeater {
@@ -196,61 +83,41 @@ PanelWindow {
                             values: Windows.windows.filter(window => window.screen?.name === bar.screen.name)
                         }
 
-                        Rectangle {
+                        BorderImage {
                             id: task
 
                             required property QtObject modelData
-                            readonly property bool active: task.modelData.activated
-                            readonly property bool minimized: task.modelData.minimized
 
                             width: Math.min(160, Math.floor((taskArea.width - (tasks.count - 1) * taskRow.spacing) / tasks.count))
-                            height: bar.height - 6
-                            radius: 3
-                            antialiasing: true
-                            color: task.active ? bar.tokens.taskActive : bar.shaded(bar.tokens.taskInactive, taskMouse.containsMouse ? 1.12 : 1)
-                            border.width: 1
-                            border.color: Qt.darker(task.active ? bar.tokens.taskActive : bar.tokens.taskInactive, 1.35)
+                            height: parent.height
+                            // Luna draws the pressed state with the same frame as the focused window.
+                            source: taskMouse.pressed ? "assets/xp-task-active.png" : task.modelData.activated ? (taskMouse.containsMouse ? "assets/xp-task-active-hover.png" : "assets/xp-task-active.png") : taskMouse.containsMouse ? "assets/xp-task-hover.png" : "assets/xp-task-normal.png"
+                            border.left: 17
+                            border.right: 5
+                            border.top: 15
+                            border.bottom: 8
+                            smooth: false
 
-                            Rectangle {
-                                visible: !task.active
-                                x: 2
-                                y: 1
-                                width: parent.width - 4
-                                height: 1
-                                color: Qt.lighter(bar.tokens.taskInactive, 1.3)
+                            IconImage {
+                                x: 8
+                                y: 7
+                                implicitSize: 16
+                                source: Windows.icon(task.modelData)
+                                opacity: task.modelData.minimized ? 0.5 : 1
                             }
 
-                            // Inset shading that makes the focused window's button look pressed in.
-                            Rectangle {
-                                visible: task.active
-                                x: 1
-                                y: 1
-                                width: parent.width - 2
-                                height: 2
-                                color: Qt.darker(bar.tokens.taskActive, 1.25)
-                            }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 6
-                                anchors.rightMargin: 6
-                                anchors.topMargin: task.active ? 1 : 0
-                                spacing: 5
-
-                                IconImage {
-                                    implicitSize: 16
-                                    source: Windows.icon(task.modelData)
-                                    opacity: task.minimized ? 0.5 : 1
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: task.modelData.title
-                                    elide: Text.ElideRight
-                                    color: bar.tokens.text
-                                    font.family: Theme.fontSans
-                                    font.pixelSize: Theme.fontSize
-                                }
+                            Text {
+                                x: 27
+                                width: parent.width - x - 4
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: task.modelData.title
+                                elide: Text.ElideRight
+                                color: "white"
+                                renderType: Text.NativeRendering
+                                font.family: tahoma.name
+                                font.pixelSize: 11
+                                font.hintingPreference: Font.PreferFullHinting
                             }
 
                             MouseArea {
@@ -272,44 +139,21 @@ PanelWindow {
                 }
             }
 
-            Rectangle {
+            BorderImage {
                 Layout.fillHeight: true
-                Layout.preferredWidth: trayRow.implicitWidth + 22
-                gradient: Gradient {
-                    GradientStop {
-                        position: 0
-                        color: bar.tokens.trayTop
-                    }
-                    GradientStop {
-                        position: 1
-                        color: bar.tokens.trayBottom
-                    }
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Qt.lighter(bar.tokens.trayTop, 1.3)
-                }
-
-                Rectangle {
-                    width: 1
-                    height: parent.height
-                    color: bar.tokens.trayBorder
-                }
-
-                Rectangle {
-                    x: 1
-                    width: 1
-                    height: parent.height
-                    color: Qt.lighter(bar.tokens.trayTop, 1.3)
-                }
+                Layout.preferredWidth: trayRow.implicitWidth + 19 + 7
+                source: "assets/xp-tray.png"
+                border.left: 34
+                border.right: 10
+                border.top: 12
+                border.bottom: 12
+                smooth: false
 
                 Row {
                     id: trayRow
 
                     anchors.verticalCenter: parent.verticalCenter
-                    x: 12
+                    x: 19
                     spacing: 6
 
                     NotificationBell {
@@ -372,12 +216,30 @@ PanelWindow {
                     }
 
                     Text {
+                        id: clockLabel
+
                         anchors.verticalCenter: parent.verticalCenter
                         leftPadding: 4
                         text: Qt.formatDateTime(clock.date, "h:mm AP")
-                        color: bar.tokens.text
-                        font.family: Theme.fontSans
-                        font.pixelSize: Theme.fontSize
+                        color: "white"
+                        renderType: Text.NativeRendering
+                        font.family: tahoma.name
+                        font.pixelSize: 11
+                        font.hintingPreference: Font.PreferFullHinting
+
+                        MouseArea {
+                            id: clockMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: dateTime.show(bar.screen)
+                        }
+
+                        TrayTooltip {
+                            trigger: clockLabel
+                            text: clock.date.toLocaleDateString(Qt.locale(), Locale.LongFormat)
+                            hovered: clockMouse.containsMouse
+                        }
                     }
                 }
             }
@@ -387,5 +249,9 @@ PanelWindow {
     SystemClock {
         id: clock
         precision: SystemClock.Minutes
+    }
+
+    XpDateTime {
+        id: dateTime
     }
 }

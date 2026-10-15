@@ -2,7 +2,7 @@ import QtQuick
 import "../frame"
 
 // The backdrop of a flyout: the theme's frame in the `tray.popup` tokens, with
-// the Aero sheen across the top.
+// the Aero sheen across the top and, under Windows 7, the white sheet inside.
 Item {
     property alias title: frame.title
 
@@ -13,6 +13,7 @@ Item {
         color: TrayStyle.popup.color
         border: TrayStyle.popup.border
         radius: TrayStyle.popup.radius
+        sheet: TrayStyle.popup.sheet
     }
 
     Rectangle {

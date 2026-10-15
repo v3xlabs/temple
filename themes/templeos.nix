@@ -105,6 +105,7 @@
       color = "#00000000";
       border = "#00000000";
       sheen = "#00000000";
+      sheet = null;
     };
     tip = {
       frame = "text";

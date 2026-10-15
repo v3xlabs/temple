@@ -46,6 +46,7 @@
     templeosFont = pkgs.callPackage ./templeos-font.nix {};
     wallpapers = pkgs.callPackage ./wallpapers.nix {};
     clippy = pkgs.callPackage ./clippy.nix {};
+    timedate = pkgs.callPackage ./timedate.nix {};
 
     stateLink = "$HOME/.local/state/temple/theme";
 
@@ -298,12 +299,7 @@
         };
         style = lib.mkOption {
           type = lib.types.enum ["xp" "win7" "macos" "templeos"];
-          description = "Desktop the bar, start menu and session dialogs imitate. Skins of one style read the same tokens from `bar`.";
-        };
-        skin = lib.mkOption {
-          type = lib.types.enum ["drawn" "msstyles" "sequoia" "tahoe"];
-          default = "drawn";
-          description = "How the bar is painted: `drawn` from gradients and the `bar` tokens, `msstyles` from bitmaps of the original Windows visual style. The `macos` style names the macOS release it follows: `sequoia` (macOS 15, translucent menu bar) or `tahoe` (macOS 26, Liquid Glass); both draw from the `bar` tokens.";
+          description = "Desktop the bar, start menu, session dialogs and clock flyout imitate. The bar of each style reads its tokens from `bar`.";
         };
         edge = lib.mkOption {
           type = lib.types.enum ["top" "bottom"];
@@ -388,11 +384,11 @@
         };
         tray = lib.mkOption {
           type = lib.types.attrsOf lib.types.anything;
-          description = "Tokens for the tray icons, flyouts, tooltips and the volume and network flyouts. See themes/xp.nix for the full set.";
+          description = "Tokens for the tray icons, flyouts, tooltips and the volume and network flyouts. See themes/xp-luna.nix for the full set; `popup.sheet` (`inset`, `color`, `border`) lays the Windows 7 white sheet inside the flyout frame, as in themes/win7-black.nix.";
         };
         notifications = lib.mkOption {
           type = lib.types.attrsOf lib.types.anything;
-          description = "Tokens for notification popups, the notification centre, action buttons and close buttons. See themes/xp.nix for the full set.";
+          description = "Tokens for notification popups, the notification centre, action buttons and close buttons. See themes/xp-luna.nix for the full set.";
         };
       };
     });
@@ -548,6 +544,7 @@
           "temple/wallpapers".source = wallpapers;
           "temple/clippy".source = clippy;
           "temple/luna".source = luna;
+          "temple/timedate".source = timedate;
           "temple/shell.json".text = builtins.toJSON {inherit (cfg) bar activateLinux;};
           "temple/share".source = "${sessionData}/share";
           # Locked, so the lock screen shows the Temple background even where
@@ -616,6 +613,21 @@
             Restart = "on-failure";
             Slice = "session.slice";
           };
+        };
+      };
+
+      # The XP Date and Time Properties dialog sets the clock by starting
+      # temple-set-time@<systemd-escaped "YYYY-MM-DD HH:MM:SS">.service. Starting
+      # it and starting or stopping timesyncd are one polkit action, so the
+      # dialog asks for the password once. timedated refuses set-time while NTP
+      # runs, and NixOS's read-only unit files make `timedatectl set-ntp` fail, so
+      # the unit stops timesyncd itself; it starts again at the next boot.
+      systemd.services."temple-set-time@" = {
+        description = "Set the clock to %I";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStartPre = "-${pkgs.systemd}/bin/systemctl stop systemd-timesyncd.service";
+          ExecStart = "${pkgs.systemd}/bin/timedatectl set-time \"%I\"";
         };
       };
 

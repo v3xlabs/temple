@@ -1,4 +1,4 @@
-# Aero glass over a dark base.
+# The aero.msstyles bar and Aero glass over a dark tint.
 let
   tint = "#0d1620";
 in {
@@ -53,71 +53,74 @@ in {
     height = 40;
     inherit tint;
     opacity = 0.6;
-    highlight = "#ffffff22";
-    orbTop = "#4fa3e0";
-    orbBottom = "#0b3d6b";
-    buttonHover = "#ffffff1f";
-    buttonActive = "#ffffff33";
     text = "#ffffff";
   };
+  # Windows 7 draws its flyouts as a white sheet inside the glass frame, whatever
+  # the glass colour, so the flyout tokens are the sheet's. The frame is the bar's
+  # glass tint at 88%.
   tray = {
-    text = "#ffffff";
-    textMuted = "#9aa8b8";
-    hover = "#ffffff26";
-    hoverBorder = "#ffffff40";
-    hoverText = "#ffffff";
-    link = "#7ec3ff";
-    separator = "#ffffff30";
-    accent = "#3a96dd";
+    text = "#000000";
+    textMuted = "#6d6d6d";
+    hover = "#e5f3fb";
+    hoverBorder = "#a8cff5";
+    hoverText = "#000000";
+    link = "#0066cc";
+    separator = "#d5dfe5";
+    accent = "#3399ff";
     rowRadius = 3;
-    iconTint = "#ffffff";
-    hoverIconTint = "#ffffff";
+    iconTint = "#00000000";
+    hoverIconTint = "#00000000";
     barIconTint = "#ffffff";
     barLabels = false;
     barHighlight = "#ffffff";
-    # Flyouts and tips are the bar's glass tint at 88% and 95%.
     popup = {
-      padding = 8;
+      padding = 14;
       radius = 6;
       color = tint + "e0";
       border = "#ffffff40";
       sheen = "#ffffff22";
+      # The sheet sits this far inside the frame, edged by a dark line.
+      sheet = {
+        inset = 6;
+        color = "#ffffff";
+        border = "#80435d6d";
+      };
     };
     tip = {
       frame = "plain";
       paddingX = 6;
       paddingY = 4;
-      radius = 3;
-      color = tint + "f2";
-      border = "#ffffff40";
+      radius = 2;
+      color = "#f4f6fb";
+      border = "#767676";
     };
     button = {
       radius = 3;
       borderWidth = 1;
-      border = "#ffffff60";
-      borderHover = "#ffffff60";
-      rest = ["#ffffff30" "#ffffff0a"];
-      hover = ["#ffffff50" "#ffffff0a"];
-      down = ["#ffffff50" "#00000030"];
-      activeText = "#ffffff";
-      activeIcon = "#ffffff";
+      border = "#707070";
+      borderHover = "#3c7fb1";
+      rest = ["#f2f2f2" "#cfcfcf"];
+      hover = ["#eaf6fd" "#a7d9f5"];
+      down = ["#c4e5f6" "#6ebee8"];
+      activeText = "#000000";
+      activeIcon = "#00000000";
     };
     radio = {
-      fill = "#00000000";
-      border = "#9aa8b8";
-      borderHover = "#ffffff";
-      dot = "#3a96dd";
+      fill = "#f4f4f4";
+      border = "#8e8f8f";
+      borderHover = "#3c7fb1";
+      dot = "#1e64c8";
     };
     network = {
-      width = 300;
-      title = "#ffffff";
+      width = 312;
+      title = "#1e395b";
       titleRule = true;
-      check = "#3a96dd";
-      checkHover = "#3a96dd";
+      check = "#3399ff";
+      checkHover = "#3399ff";
       field = {
-        radius = 3;
-        color = "#2a3646";
-        border = "#ffffff30";
+        radius = 2;
+        color = "#ffffff";
+        border = "#abadb3";
       };
       banner = null;
       list = {
@@ -127,23 +130,24 @@ in {
       settingsLink = true;
     };
     volume = {
-      width = 250;
+      width = 262;
       layout = "speaker";
       slider = {
-        groove = "#0a0f16";
-        grooveBorder = "#ffffff40";
-        fill = "#3a96dd";
+        groove = "#e7eaea";
+        grooveBorder = "#b0b0b0";
+        fill = "#3399ff";
         ticks = 0;
         thumb = ["#f2f6fa" "#9fb2c8"];
-        thumbBorder = "#202a36";
-        thumbBorderHover = "#202a36";
+        thumbBorder = "#707070";
+        thumbBorderHover = "#3c7fb1";
       };
       output = "Output device";
       outputStrong = false;
       settingsLink = false;
+      # The footer strip Windows 7 puts under its flyouts.
       mixer = {
-        color = "#00000030";
-        border = "#ffffff20";
+        color = "#f1f5fb";
+        border = "#ccd9ea";
       };
     };
   };

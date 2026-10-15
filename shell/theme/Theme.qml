@@ -33,7 +33,6 @@ Singleton {
 
     readonly property string label: data.label ?? name
     readonly property string style: data.style ?? ""
-    readonly property string skin: data.skin ?? "drawn"
     readonly property var palette: data.palette ?? ({})
     readonly property color accent: data.accent ?? "#79b8ff"
     readonly property color surface: data.glass?.tint ?? "#14141c"

@@ -276,168 +276,15 @@ PanelWindow {
                 width: parent.width
                 y: desk.theme.edge === "top" ? 0 : parent.height - height
                 sourceComponent: ({
-                        "xp/drawn": xpBar,
-                        "xp/msstyles": xpLunaBar,
-                        "win7/drawn": win7Bar,
-                        "win7/msstyles": win7AeroBar,
-                        "macos/sequoia": macosBar,
-                        "macos/tahoe": macosBar,
-                        "templeos/drawn": templeosBar
-                    })[desk.theme.style + "/" + desk.theme.skin]
+                        xp: xpBar,
+                        win7: win7Bar,
+                        macos: macosBar,
+                        templeos: templeosBar
+                    })[desk.theme.style]
             }
 
             Component {
                 id: xpBar
-
-                Rectangle {
-                    height: 30
-                    gradient: Gradient {
-                        GradientStop {
-                            position: 0
-                            color: desk.bar.taskbarTop
-                        }
-                        GradientStop {
-                            position: 0.5
-                            color: desk.bar.taskbarMid
-                        }
-                        GradientStop {
-                            position: 1
-                            color: desk.bar.taskbarBottom
-                        }
-                    }
-
-                    Rectangle {
-                        width: 92
-                        height: parent.height
-                        topRightRadius: 12
-                        bottomRightRadius: 12
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: desk.bar.startTop
-                            }
-                            GradientStop {
-                                position: 0.5
-                                color: desk.bar.startMid
-                            }
-                            GradientStop {
-                                position: 1
-                                color: desk.bar.startBottom
-                            }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "start"
-                            color: "white"
-                            font.family: desk.theme.font.sans
-                            font.pixelSize: 16
-                            font.italic: true
-                            font.bold: true
-                        }
-                    }
-
-                    Rectangle {
-                        x: 104
-                        y: 4
-                        width: 130
-                        height: parent.height - 8
-                        radius: 3
-                        color: desk.bar.taskActive
-                    }
-
-                    Rectangle {
-                        anchors.right: parent.right
-                        width: 86
-                        height: parent.height
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: desk.bar.trayTop
-                            }
-                            GradientStop {
-                                position: 1
-                                color: desk.bar.trayBottom
-                            }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "12:00"
-                            color: desk.bar.text
-                            font.family: desk.theme.font.sans
-                            font.pixelSize: 12
-                        }
-                    }
-                }
-            }
-
-            Component {
-                id: win7Bar
-
-                Rectangle {
-                    height: 40
-                    color: Qt.alpha(desk.bar.tint, desk.bar.opacity)
-
-                    Rectangle {
-                        width: parent.width
-                        height: 1
-                        color: desk.bar.highlight
-                    }
-
-                    Rectangle {
-                        x: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 32
-                        height: 32
-                        radius: 16
-                        border.color: "#66ffffff"
-                        border.width: 1
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: desk.bar.orbTop
-                            }
-                            GradientStop {
-                                position: 1
-                                color: desk.bar.orbBottom
-                            }
-                        }
-                    }
-
-                    Row {
-                        x: 56
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 4
-
-                        Repeater {
-                            model: 3
-
-                            Rectangle {
-                                required property int index
-
-                                width: 48
-                                height: 32
-                                radius: 3
-                                color: index === 0 ? desk.bar.buttonActive : desk.bar.buttonHover
-                            }
-                        }
-                    }
-
-                    Text {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "12:00"
-                        color: desk.bar.text
-                        font.family: desk.theme.font.sans
-                        font.pixelSize: 12
-                    }
-                }
-            }
-
-            Component {
-                id: xpLunaBar
 
                 BorderImage {
                     height: 30
@@ -489,7 +336,7 @@ PanelWindow {
             }
 
             Component {
-                id: win7AeroBar
+                id: win7Bar
 
                 Rectangle {
                     height: 40

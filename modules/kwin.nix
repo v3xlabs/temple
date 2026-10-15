@@ -1,6 +1,6 @@
 # One window decoration and one Alt+Tab switcher per Temple theme, as KWin
 # packages named temple-<theme>. Each package is the shared QML in ./kwin plus
-# a Tokens.qml with that theme's values. XP themes draw their frame from the
+# a Tokens.qml with that theme's values. The XP theme draws its frame from the
 # Luna visual style instead (luna.nix).
 {
   lib,

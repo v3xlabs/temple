@@ -31,7 +31,6 @@ in
     inherit bar;
     label = "macOS Tahoe";
     style = "macos";
-    skin = "tahoe";
     edge = "top";
     palette = {
       base00 = "#f6f6f6";

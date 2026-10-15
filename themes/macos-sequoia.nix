@@ -31,7 +31,6 @@ in
     inherit bar;
     label = "macOS Sequoia";
     style = "macos";
-    skin = "sequoia";
     edge = "top";
     palette = {
       base00 = "#f6f6f6";

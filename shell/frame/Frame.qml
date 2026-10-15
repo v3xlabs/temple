@@ -4,7 +4,9 @@ import "../macos"
 
 // The backdrop of a flyout, tip or panel in the theme's frame: a plain
 // rectangle from `color`, `border` and `radius`, the macOS glass material, or
-// a TempleOS text-mode border that also carries the title.
+// a TempleOS text-mode border that also carries the title. A `sheet`
+// ({inset, color, border}) lays a sheet inside the frame, as Windows 7 lays
+// its white flyout sheet inside the glass.
 Item {
     id: frame
 
@@ -14,6 +16,7 @@ Item {
     property real radius
     property string title
     property bool double: true
+    property var sheet: null
     readonly property bool titled: frame.kind === "text"
 
     Rectangle {
@@ -40,6 +43,18 @@ Item {
         sourceComponent: TempleosFrame {
             title: frame.title
             double: frame.double
+        }
+    }
+
+    Loader {
+        anchors.fill: parent
+        active: frame.sheet !== null
+        sourceComponent: Rectangle {
+            anchors.fill: parent
+            anchors.margins: frame.sheet.inset
+            color: frame.sheet.color
+            border.width: 1
+            border.color: frame.sheet.border
         }
     }
 }
