@@ -175,6 +175,11 @@
         action = "toggleBackgrounds";
         description = "Pick background";
       };
+      clipboard = {
+        keys = ["Meta+V"];
+        action = "toggleClipboard";
+        description = "Clipboard history";
+      };
       terminal = {
         keys = ["Meta+Return" "Alt+K"];
         command = lib.getExe cfg.terminal;
@@ -550,6 +555,12 @@
           "temple/xdg/kscreenlockerrc".text = ''
             [Greeter][Wallpaper][org.kde.image][General]
             Image[$ie]=file://$HOME/.local/state/temple/background
+          '';
+          # Klipper ignores images by default. Not locked, so a choice made in
+          # Klipper's settings under plain Plasma still applies here.
+          "temple/xdg/klipperrc".text = ''
+            [General]
+            IgnoreImages=false
           '';
         }
         // lib.concatMapAttrs themeFiles cfg.themes;

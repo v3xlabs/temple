@@ -14,6 +14,7 @@ import "start"
 import "windows"
 import "clippy"
 import "osd"
+import "clipboard"
 
 ShellRoot {
     id: shell
@@ -79,6 +80,10 @@ ShellRoot {
         id: keybinds
     }
 
+    Clipboard {
+        id: clipboard
+    }
+
     // Popups read theme tokens from their first binding.
     LazyLoader {
         active: Theme.ready
@@ -131,6 +136,9 @@ ShellRoot {
         }
         function toggleKeybinds(): void {
             keybinds.toggle();
+        }
+        function toggleClipboard(): void {
+            clipboard.toggle();
         }
         function toggleStart(): void {
             const focused = Windows.focusedScreen;
