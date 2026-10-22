@@ -9,7 +9,10 @@
 }: let
   # XP shipped Bliss at 800x600; this is the 1920x1080 scan of the photograph.
   bliss = fetchurl {
-    url = "https://archive.org/download/windows-bliss-wallpaper-pack/Bliss_OG%28DesktopWallpaper%29.png";
+    urls = [
+      "https://archive.org/download/windows-bliss-wallpaper-pack/Bliss_OG%28DesktopWallpaper%29.png"
+      "https://ia800404.us.archive.org/24/items/windows-bliss-wallpaper-pack/Bliss_OG%28DesktopWallpaper%29.png"
+    ];
     hash = "sha256-sDH0/4Ztkk6uoI2Jrg/wLzSOLN1a1z+JRghrCwJcJ1U=";
   };
   xp = fetchzip {
