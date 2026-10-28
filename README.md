@@ -104,3 +104,17 @@ Temple's shortcuts are two KDE global shortcut components, present only in the T
 | Alt+Tab / Alt+Shift+Tab | Window switcher in the style of the theme, with live previews, most recently used first. Release Alt to switch, Escape to cancel |
 
 Plasma's defaults cover the rest, among them Super+L to lock, Super+E for Dolphin, Print for Spectacle, Super+Arrows to tile, Super+PgUp to maximize, Super+Drag to move, and the volume, media and brightness keys.
+
+## Sign-in screen
+
+An XP-style SDDM sign-in screen, off by default.
+
+```nix
+inputs.temple.url = "github:lucemans/v3x-temple";
+
+# in a host
+imports = [inputs.temple.nixosModules.sddm];
+temple.sddm.enable = true;
+```
+
+`nixosModules.temple` already imports this module, so with Temple only `temple.sddm.enable = true;` is needed.

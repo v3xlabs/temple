@@ -14,11 +14,7 @@
     kitty = import ./kitty.nix;
     shellSource = self.packages.${pkgs.stdenv.hostPlatform.system}.shell;
 
-    # Wine ships Tahoma under the LGPL. Only Tahoma is taken so Wine's Courier
-    # and Symbol do not shadow the fonts other apps resolve those names to.
-    tahoma = pkgs.runCommand "tahoma" {} ''
-      install -Dm444 -t $out/share/fonts/truetype ${pkgs.wineWow64Packages.fonts}/share/fonts/truetype/tahoma{,bd}.ttf
-    '';
+    tahoma = pkgs.callPackage ./tahoma.nix {};
 
     # Apple's San Francisco downloads: each dmg holds a pkg whose gzip payload
     # is a cpio archive. 7z unwraps the dmg and pkg layers; cpio the payload.
@@ -399,6 +395,7 @@
       "temple/themes/${name}/xdg/kwinrc".text = kwinrc name;
     };
   in {
+    imports = [self.nixosModules.sddm];
     options.temple = {
       enable = lib.mkEnableOption "the v3x temple desktop: a Temple session next to Plasma 6, with the Temple shell in place of plasmashell";
 

@@ -1,6 +1,7 @@
 {self, ...}: {
   perSystem = {pkgs, ...}: {
     packages = {
+      sddm-theme = import ../modules/sddm/package.nix {inherit pkgs;};
       shell = pkgs.stdenvNoCC.mkDerivation {
         name = "temple-shell";
         src = ../shell;
