@@ -30,6 +30,6 @@
             touch $out
           '';
       }
-      // lib.genAttrs ["sessions" "picker-screens" "pickers" "clippy" "startmenu" "clipboard" "health"] (name: import ../tests/${name}.nix {inherit pkgs test;});
+      // lib.genAttrs ["sessions" "picker-screens" "bar-screens" "pickers" "clippy" "startmenu" "clipboard" "health"] (name: import ../tests/${name}.nix {inherit pkgs test;});
   };
 }

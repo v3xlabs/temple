@@ -451,14 +451,14 @@
         top = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [];
-          example = ["DP-5"];
-          description = "Outputs that show a bar at the top edge, by connector name as System Settings' Display page names it. An empty list shows it on every output. The XP and Windows 7 themes draw no top bar.";
+          example = ["left"];
+          description = "Outputs that show a bar at the top edge. An entry is a position in the layout of System Settings' Display page, `left`, `right`, `top` or `bottom`, which picks the one output furthest that way, or a connector name such as `DP-5`. Connector names can change between boots, while the layout stays, so prefer a position. A list that is empty or matches no connected output shows it on every output. The XP and Windows 7 themes draw no top bar.";
         };
         bottom = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [];
-          example = ["DP-4"];
-          description = "Outputs that show a bar at the bottom edge, such as the XP and Windows 7 taskbars. An empty list shows it on every output.";
+          example = ["right"];
+          description = "Outputs that show a bar at the bottom edge, such as the XP and Windows 7 taskbars. Entries match as for `top`.";
         };
       };
 
@@ -468,7 +468,7 @@
           type = lib.types.listOf lib.types.str;
           default = [];
           example = ["DP-4"];
-          description = "Outputs that show the watermark, by connector name. An empty list shows it on every output.";
+          description = "Outputs that show the watermark. Entries match as for `bar.monitors.top`.";
         };
       };
     };

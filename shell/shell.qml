@@ -19,11 +19,28 @@ import "clipboard"
 ShellRoot {
     id: shell
 
-    readonly property var barScreens: Config.barMonitors[Theme.barEdge] ?? []
-    readonly property var watermarkScreens: Config.activateLinuxMonitors
+    readonly property var barScreens: pick(Config.barMonitors[Theme.barEdge] ?? [])
+    readonly property var watermarkScreens: pick(Config.activateLinuxMonitors)
+
+    // Connector names can change between boots, while KWin keeps each screen's place in the layout, so an entry may name a position instead.
+    // A list that matches no connected output shows on every output.
+    function pick(wanted: var): var {
+        const matched = Quickshell.screens.filter(screen => wanted.some(entry => entry === screen.name || at(entry) === screen));
+        return matched.length > 0 ? matched : Quickshell.screens;
+    }
+
+    function at(position: string): var {
+        const order = {
+            left: (a, b) => a.x - b.x || a.y - b.y,
+            right: (a, b) => b.x + b.width - (a.x + a.width) || a.y - b.y,
+            top: (a, b) => a.y - b.y || a.x - b.x,
+            bottom: (a, b) => b.y + b.height - (a.y + a.height) || a.x - b.x
+        }[position];
+        return order ? Quickshell.screens.slice().sort(order)[0] : null;
+    }
 
     function hasBar(screen: ShellScreen): bool {
-        return barScreens.length === 0 || barScreens.includes(screen.name);
+        return barScreens.includes(screen);
     }
 
     Variants {
@@ -36,7 +53,7 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => shell.hasBar(screen))
+        model: shell.barScreens
 
         Bar {
             required property ShellScreen modelData
@@ -47,7 +64,7 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => shell.watermarkScreens.length === 0 || shell.watermarkScreens.includes(screen.name))
+        model: shell.watermarkScreens
 
         Watermark {
             required property ShellScreen modelData
