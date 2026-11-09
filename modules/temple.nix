@@ -26,7 +26,7 @@
           url = "https://devimages-cdn.apple.com/design/resources/download/${name}.dmg";
           inherit hash;
         };
-      pro = dmg "SF-Pro" "sha256-loqzuLH5LC2K9h6waA9cIiTE541ZuYa/AEUCp/wBKRg=";
+      pro = dmg "SF-Pro" "sha256-sn/mYi8fqWpwfHPcpmZtQ5w1sxLVsdR+DimA5hjrSyg=";
       mono = dmg "SF-Mono" "sha256-bUoLeOOqzQb5E/ZCzq0cfbSvNO1IhW1xcaLgtV2aeUU=";
     in
       pkgs.runCommand "san-francisco" {nativeBuildInputs = [pkgs.p7zip pkgs.cpio];} ''
